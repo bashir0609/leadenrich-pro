@@ -28,20 +28,3 @@ export const validate = (schema: z.ZodSchema) => {
     }
   };
 };
-
-// Query validation middleware
-export const validateQuery = (schema: z.ZodSchema) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const validated = await schema.parseAsync(req.query);
-      req.query = validated as any;
-      next();
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        next(BadRequestError('Query validation failed', error.errors));
-      } else {
-        next(error);
-      }
-    }
-  };
-};

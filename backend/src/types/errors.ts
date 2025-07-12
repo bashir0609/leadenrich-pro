@@ -19,24 +19,28 @@ export enum ErrorCode {
   PROVIDER_RATE_LIMIT = 'PROVIDER_RATE_LIMIT',
 }
 
+export interface ErrorDetails {
+  [key: string]: unknown;
+}
+
 export interface AppError extends Error {
   code: ErrorCode;
   statusCode: number;
-  details?: any;
+  details?: ErrorDetails;
   isOperational: boolean;
 }
 
 export class CustomError extends Error implements AppError {
   public readonly code: ErrorCode;
   public readonly statusCode: number;
-  public readonly details?: any;
+  public readonly details?: ErrorDetails;
   public readonly isOperational: boolean;
 
   constructor(
     code: ErrorCode,
     message: string,
     statusCode: number = 500,
-    details?: any,
+    details?: ErrorDetails,
     isOperational: boolean = true
   ) {
     super(message);
@@ -51,17 +55,17 @@ export class CustomError extends Error implements AppError {
 }
 
 // Helper functions for common errors
-export const BadRequestError = (message: string, details?: any) =>
+export const BadRequestError = (message: string, details?: ErrorDetails): CustomError =>
   new CustomError(ErrorCode.INVALID_INPUT, message, 400, details);
 
-export const NotFoundError = (message: string, details?: any) =>
+export const NotFoundError = (message: string, details?: ErrorDetails): CustomError =>
   new CustomError(ErrorCode.NOT_FOUND, message, 404, details);
 
-export const UnauthorizedError = (message: string, details?: any) =>
+export const UnauthorizedError = (message: string, details?: ErrorDetails): CustomError =>
   new CustomError(ErrorCode.AUTHENTICATION_ERROR, message, 401, details);
 
-export const ForbiddenError = (message: string, details?: any) =>
+export const ForbiddenError = (message: string, details?: ErrorDetails): CustomError =>
   new CustomError(ErrorCode.AUTHORIZATION_ERROR, message, 403, details);
 
-export const InternalServerError = (message: string, details?: any) =>
+export const InternalServerError = (message: string, details?: ErrorDetails): CustomError =>
   new CustomError(ErrorCode.INTERNAL_SERVER_ERROR, message, 500, details, false);

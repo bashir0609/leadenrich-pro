@@ -6,7 +6,7 @@ export const errorHandler = (
   err: Error | CustomError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction // Renamed to _next to indicate it's not used
 ): void => {
   // Log error
   logger.error({
@@ -25,7 +25,7 @@ export const errorHandler = (
       error: {
         code: err.code,
         message: err.message,
-        ...(process.env.NODE_ENV === 'development' && { details: err.details }),
+        ...(process.env.NODE_ENV === 'development' ? { details: err.details } : {}),
       },
     });
     return;
@@ -37,10 +37,10 @@ export const errorHandler = (
     error: {
       code: ErrorCode.INTERNAL_SERVER_ERROR,
       message: 'An unexpected error occurred',
-      ...(process.env.NODE_ENV === 'development' && { 
+      ...(process.env.NODE_ENV === 'development' ? { 
         originalError: err.message,
         stack: err.stack 
-      }),
+      } : {}),
     },
   });
 };

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
 
@@ -22,7 +22,7 @@ interface ServiceHealth {
 }
 
 // Basic health check
-router.get('/', (req, res) => {
+router.get('/', (req: Request, res: Response): void => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -30,10 +30,8 @@ router.get('/', (req, res) => {
   });
 });
 
-// Detailed health check
-router.get('/detailed', async (req, res) => {
-  const startTime = Date.now();
-  
+// Detailed health check - use async wrapper to handle promises correctly
+router.get('/detailed', async (req: Request, res: Response): Promise<void> => {
   try {
     // Check database
     const dbHealth = await checkDatabase();
