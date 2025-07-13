@@ -68,6 +68,7 @@ model EnrichmentJob {
   successfulRecords Int       @default(0)
   failedRecords     Int       @default(0)
   inputData         Json?
+  outputData        Json?
   configuration     Json?
   creditsUsed       Int       @default(0)
   errorDetails      Json?

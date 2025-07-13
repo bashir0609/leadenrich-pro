@@ -20,7 +20,11 @@ export const useProviderStore = create<ProviderStore>()(
       reset: () => set({ selectedProvider: null, selectedOperation: null }),
     }),
     {
-      name: 'provider-store', // localStorage key
+      name: 'provider-store',
+      partialize: (state) => ({ 
+        selectedProvider: state.selectedProvider,
+        selectedOperation: state.selectedOperation
+      }),
     }
   )
 );

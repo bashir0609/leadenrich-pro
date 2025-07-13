@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,13 +22,17 @@ interface ProviderDetailsProps {
 
 export function ProviderDetails({ provider, onClose }: ProviderDetailsProps) {
   const { setSelectedProvider } = useProviderStore();
+  const router = useRouter();
   const Icon = categoryIcons[provider.category as keyof typeof categoryIcons] || Building2;
 
   const handleSelect = () => {
     setSelectedProvider(provider);
     onClose();
+    
+    // Add this line to navigate to enrichment
+    router.push('/enrichment');
   };
-
+  
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">

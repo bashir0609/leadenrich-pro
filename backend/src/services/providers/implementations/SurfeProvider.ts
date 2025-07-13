@@ -12,12 +12,12 @@ import {
 } from '@/types/providers';
 import { logger } from '@/utils/logger';
 import axios from 'axios';
-import { ProviderRegistry } from '../ProviderRegistry';
 
 interface SurfeApiError {
   code: string;
   message: string;
   details?: any;
+  [key: string]: any;
 }
 
 // Maximum time to wait for enrichment completion (in milliseconds)
@@ -567,5 +567,7 @@ export class SurfeProvider extends BaseProvider {
   }
 }
 
+// Import the provider registry to register this provider
+import { ProviderRegistry } from '../ProviderRegistry';
 // Register the provider
 ProviderRegistry.register('surfe', SurfeProvider);

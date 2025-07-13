@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUpload } from '@/components/common/FileUpload';
 import { ColumnMapping } from '@/components/enrichment/ColumnMapping';
@@ -38,18 +38,20 @@ export default function EnrichmentPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // if (!selectedProvider) {
-  //   router.push('/');
-  //   return null;
-  // }
+  // Redirect if no provider selected
+  useEffect(() => {
+    if (!selectedProvider) {
+      router.push('/');
+    }
+  }, [selectedProvider, router]);
 
-  const mockProvider = selectedProvider || {
-    id: 1,
-    name: 'surfe',
-    displayName: 'Surfe',
-    category: 'major-database',
-    features: []
-  };
+  // If no provider is selected, show loading or return null
+  if (!selectedProvider) {
+    return null;
+  }
+
+  // Use the actual selected provider
+  const provider = selectedProvider;
 
   const handleFileSelect = async (file: File) => {
     setUploadedFile(file);
@@ -107,7 +109,7 @@ export default function EnrichmentPage() {
   ];
 
   const handleStartEnrichment = async () => {
-    if (!parsedData || !mockProvider) return;
+    if (!parsedData || !provider) return;
 
     // Validate required fields
     const hasRequiredFields = targetFields
@@ -131,7 +133,7 @@ export default function EnrichmentPage() {
 
       // Create bulk job
       const result = await createBulkJob.mutateAsync({
-        providerId: mockProvider.name,
+        providerId: provider.name,
         data: {
           operation: 'enrich-person',
           records,
@@ -176,7 +178,7 @@ export default function EnrichmentPage() {
           <div>
             <h1 className="text-3xl font-bold">Data Enrichment</h1>
             <p className="text-muted-foreground">
-              Using {mockProvider.displayName} provider
+              Using {provider.displayName} provider
             </p>
           </div>
         </div>

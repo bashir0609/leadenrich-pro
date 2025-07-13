@@ -69,6 +69,49 @@ async function main() {
     },
   });
 
+  const apollo = await prisma.provider.upsert({
+    where: { name: 'apollo' },
+    update: {},
+    create: {
+      name: 'apollo',
+      displayName: 'Apollo.io',
+      category: 'major-database',
+      baseUrl: 'https://api.apollo.io/v1',
+      apiKeyEncrypted: process.env.APOLLO_API_KEY 
+        ? crypto.AES.encrypt(process.env.APOLLO_API_KEY, encryptionKey).toString()
+        : null,
+      rateLimit: 50,
+      dailyQuota: 10000,
+      isActive: true,
+      configuration: {
+        database_size: '275M contacts',
+        strengths: ['US data', 'Technology companies', 'Sales intelligence'],
+      },
+    },
+  });
+
+  // Seed BetterEnrich provider
+  const betterEnrich = await prisma.provider.upsert({
+    where: { name: 'betterenrich' },
+    update: {},
+    create: {
+      name: 'betterenrich',
+      displayName: 'BetterEnrich',
+      category: 'email-finder',
+      baseUrl: 'https://api.betterenrich.com/v1',
+      apiKeyEncrypted: process.env.BETTERENRICH_API_KEY 
+        ? crypto.AES.encrypt(process.env.BETTERENRICH_API_KEY, encryptionKey).toString()
+        : null,
+      rateLimit: 30,
+      dailyQuota: 5000,
+      isActive: true,
+      configuration: {
+        features_count: 20,
+        categories: ['enrichment', 'email-finder', 'phone-finder', 'ad-intelligence', 'social-enrichment'],
+      },
+    },
+  });
+  
   // Seed Surfe features
   console.log('✨ Creating Surfe features...');
   const surfeFeatures = [

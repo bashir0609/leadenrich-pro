@@ -11,6 +11,10 @@ import { healthRouter } from './routes/health';
 import { providersRouter } from './routes/providers';
 import { jobsRouter } from './routes/jobs';
 import { uploadRouter } from './routes/upload';
+import { exportRouter } from './routes/export';
+import './services/providers/implementations/SurfeProvider';
+import './services/providers/implementations/ApolloProvider';
+import './services/providers/implementations/BetterEnrichProvider';
 
 // Load environment variables
 dotenv.config();
@@ -66,6 +70,7 @@ app.use('/health', healthRouter);
 app.use('/api/providers', providersRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/export', exportRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
