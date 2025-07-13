@@ -4290,3 +4290,7 @@
 {"level":"info","message":"🚀 LeadEnrich Pro API server running on port 3001","service":"leadenrich-api","timestamp":"2025-07-13 17:52:53"}
 {"level":"info","message":"📖 Environment: development","service":"leadenrich-api","timestamp":"2025-07-13 17:52:53"}
 {"level":"info","message":"🌐 API URL: http://localhost:3001","service":"leadenrich-api","timestamp":"2025-07-13 17:52:53"}
+{"level":"info","message":"✅ Enrichment worker started","service":"leadenrich-api","timestamp":"2025-07-13 17:54:49"}
+{"level":"info","message":"🚀 LeadEnrich Pro API server running on port 3001","service":"leadenrich-api","timestamp":"2025-07-13 17:54:49"}
+{"level":"info","message":"📖 Environment: development","service":"leadenrich-api","timestamp":"2025-07-13 17:54:49"}
+{"level":"info","message":"🌐 API URL: http://localhost:3001","service":"leadenrich-api","timestamp":"2025-07-13 17:54:49"}
