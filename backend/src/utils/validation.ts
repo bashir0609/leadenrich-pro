@@ -21,7 +21,7 @@ export const validate = (schema: z.ZodSchema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        next(BadRequestError('Validation failed', error.errors));
+        next(BadRequestError('Validation failed', { errors: error.errors }));
       } else {
         next(error);
       }

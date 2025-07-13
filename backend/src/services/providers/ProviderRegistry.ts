@@ -1,36 +1,70 @@
-import { EnrichmentProvider } from '../../types/providers';
-import { SurfeProvider } from './implementations/SurfeProvider';
+import { BaseProvider } from './base/BaseProvider';
+import { ProviderConfig } from '@/types/providers';
+import { CustomError, ErrorCode } from '@/types/errors';
+import { logger } from '@/utils/logger';
 
-class ProviderRegistry {
-  private providers: Map<string, EnrichmentProvider> = new Map();
+export class ProviderRegistry {
+  private static providers: Map<string, new (config: ProviderConfig) => BaseProvider> = new Map();
+  private static instances: Map<string, BaseProvider> = new Map();
 
-  constructor() {
-    this.initializeProviders();
+  // Register a provider class
+  static register(providerId: string, providerClass: new (config: ProviderConfig) => BaseProvider): void {
+    if (this.providers.has(providerId)) {
+      logger.warn(`Provider ${providerId} is already registered. Overwriting.`);
+    }
+    this.providers.set(providerId, providerClass);
+    logger.info(`Provider ${providerId} registered successfully`);
   }
 
-  private initializeProviders() {
-    // In the future, we will load these from the database
-    const surfeProvider = new SurfeProvider();
-    this.register(surfeProvider);
+  // Get or create a provider instance
+  static async getInstance(
+    providerId: string,
+    config: ProviderConfig
+  ): Promise<BaseProvider> {
+    // Check if instance already exists
+    if (this.instances.has(providerId)) {
+      return this.instances.get(providerId)!;
+    }
 
-    // Register other providers here later
-    // const apolloProvider = new ApolloProvider();
-    // this.register(apolloProvider);
+    // Get provider class
+    const ProviderClass = this.providers.get(providerId);
+    if (!ProviderClass) {
+      throw new CustomError(
+        ErrorCode.PROVIDER_NOT_FOUND,
+        `Provider ${providerId} is not registered`,
+        404
+      );
+    }
+
+    // Create new instance
+    const instance = new ProviderClass(config);
+    
+    // Validate and authenticate if methods exist
+    if (typeof instance.validateConfig === 'function') {
+      instance.validateConfig();
+    }
+    
+    if (typeof instance.authenticate === 'function') {
+      await instance.authenticate();
+    }
+
+    // Cache instance
+    this.instances.set(providerId, instance);
+    
+    return instance;
   }
 
-  public register(provider: EnrichmentProvider) {
-    this.providers.set(provider.name, provider);
-    console.log(`✅ Provider registered: ${provider.name}`);
+  // Initialize providers from a configuration list
+  static initialize(providerConfigs: ProviderConfig[]): void {
+    logger.info(`Initializing providers: ${providerConfigs.map(p => p.name).join(', ')}`);
+    // This will be used by the ProviderFactory
   }
 
-  public getProvider(name: string): EnrichmentProvider | undefined {
-    return this.providers.get(name);
-  }
-
-  public getAvailableProviders(): string[] {
+  static getRegisteredProviders(): string[] {
     return Array.from(this.providers.keys());
   }
-}
 
-// Export a singleton instance
-export const providerRegistry = new ProviderRegistry();
+  static clearInstances(): void {
+    this.instances.clear();
+  }
+}
