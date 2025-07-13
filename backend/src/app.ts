@@ -10,6 +10,7 @@ import { notFoundHandler } from './middleware/notFoundHandler';
 import { healthRouter } from './routes/health';
 import { providersRouter } from './routes/providers';
 import { jobsRouter } from './routes/jobs';
+import { uploadRouter } from './routes/upload';
 
 // Load environment variables
 dotenv.config();
@@ -24,7 +25,7 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -64,6 +65,7 @@ app.use((req, res, next) => {
 app.use('/health', healthRouter);
 app.use('/api/providers', providersRouter);
 app.use('/api/jobs', jobsRouter);
+app.use('/api/upload', uploadRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
