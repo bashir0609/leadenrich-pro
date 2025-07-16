@@ -1,10 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '@/utils/validation';
+import { ProviderOperation } from '@/types/providers';
 import { ProviderFactory } from '@/services/providers/ProviderFactory';
 import { QueueService } from '@/services/QueueService';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/logger';
+import { CustomRequest } from '@/types/express';
+import { BadRequestError, NotFoundError } from '@/types/errors';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -89,21 +92,18 @@ const executeSchema = z.object({
 router.post(
   '/:providerId/execute',
   validate(executeSchema),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req, res, next) => {
     try {
       const { providerId } = req.params;
-      const { operation, params, options } = req.body;
       
+      // Validate providerId is present
       if (!providerId) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_INPUT',
-            message: 'Provider ID is required',
-          },
-        });
-        return;
+        throw BadRequestError('Provider ID is required');
       }
+      
+      const { operation, params, options } = req.body;
+
+      logger.info(`Executing ${operation} on provider ${providerId}`, { params });
 
       const provider = await ProviderFactory.getProvider(providerId);
       const result = await provider.execute({

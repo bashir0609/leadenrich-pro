@@ -1,4 +1,5 @@
 import express, { Application } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -12,6 +13,7 @@ import { providersRouter } from './routes/providers';
 import { jobsRouter } from './routes/jobs';
 import { uploadRouter } from './routes/upload';
 import { exportRouter } from './routes/export';
+import { setupSocket } from './config/socket';
 import './services/providers/implementations/SurfeProvider';
 import './services/providers/implementations/ApolloProvider';
 import './services/providers/implementations/BetterEnrichProvider';
@@ -22,6 +24,18 @@ dotenv.config();
 // Create Express app
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
+
+// Create HTTP server
+const server = createServer(app);
+
+// Setup Socket.io
+const io = setupSocket(server);
+
+// Make io available globally for job notifications
+declare global {
+  var io: import('socket.io').Server;  // ✅ Use the actual type
+}
+global.io = io;
 
 // Security middleware
 app.use(helmet({
@@ -98,12 +112,20 @@ if (process.env.NODE_ENV !== 'test') {
   logger.info('✅ Enrichment worker started');
 }
 
-// Start server
-const server = app.listen(PORT, () => {
+// Start server with Socket.io support
+server.listen(PORT, () => {
   logger.info(`🚀 LeadEnrich Pro API server running on port ${PORT}`);
   logger.info(`📖 Environment: ${process.env.NODE_ENV}`);
   logger.info(`🌐 API URL: http://localhost:${PORT}`);
+  logger.info(`🔌 Socket.io enabled`);
 });
+
+// Start server
+// const server = app.listen(PORT, () => {
+//   logger.info(`🚀 LeadEnrich Pro API server running on port ${PORT}`);
+//   logger.info(`📖 Environment: ${process.env.NODE_ENV}`);
+//   logger.info(`🌐 API URL: http://localhost:${PORT}`);
+// });
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
