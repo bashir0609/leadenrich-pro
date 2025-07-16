@@ -1,4 +1,4 @@
-// frontend/src/app/providers/[name]/page.tsx
+// frontend/src/app/providers/[name]/people-search/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -118,6 +118,16 @@ export default function PeopleSearchPage() {
     lines: [],
     field: 'companyDomains',
     selectedColumn: ''
+  });
+
+  const [domainInput, setDomainInput] = useState({
+    companyDomains: '',
+    excludeDomains: '',
+  });
+
+  const [domainValidationErrors, setDomainValidationErrors] = useState({
+    companyDomains: [] as string[],
+    excludeDomains: [] as string[],
   });
 
   // Prevent hydration errors
@@ -307,6 +317,43 @@ export default function PeopleSearchPage() {
     setCsvImportModal(prev => ({ ...prev, show: false, selectedColumn: '' }));
   };
 
+  // New method to handle domain input changes
+  const handleDomainChange = (field: 'companyDomains' | 'excludeDomains', value: string) => {
+    // Update input value
+    setDomainInput(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    // Process domains
+    const domains = value.split('\n')
+      .map(line => line.trim())
+      .filter(line => line !== '');
+
+    // Validate domains
+    const validationErrors: string[] = [];
+    const cleanedDomains = domains.filter(domain => {
+      const validation = DataCleaningService.validateDomainFeedback(domain);
+      if (!validation.isValid) {
+        validationErrors.push(`${domain}: ${validation.message}`);
+        return false;
+      }
+      return true;
+    });
+
+    // Set validation errors
+    setDomainValidationErrors(prev => ({
+      ...prev,
+      [field]: validationErrors
+    }));
+
+    // Update search parameters with cleaned domains
+    setSearchParams(prev => ({
+      ...prev,
+      [field]: cleanedDomains
+    }));
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -434,13 +481,20 @@ export default function PeopleSearchPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Include Domains</Label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col">
                     <textarea
                       className="w-full h-24 p-2 border rounded-md resize-none text-sm"
                       placeholder="google.com&#10;microsoft.com&#10;apple.com"
-                      value={searchParams.companyDomains.join('\n')}
-                      onChange={(e) => handleTextareaChange('companyDomains', e.target.value)}
+                      value={domainInput.companyDomains}
+                      onChange={(e) => handleDomainChange('companyDomains', e.target.value)}
                     />
+                    {domainValidationErrors.companyDomains.length > 0 && (
+                      <div className="text-red-500 text-xs mt-1">
+                        {domainValidationErrors.companyDomains.map((error, index) => (
+                          <p key={index}>{error}</p>
+                        ))}
+                      </div>
+                    )}
 
                     <div>
                       <Label className="block mb-2">Import CSV</Label>
@@ -452,7 +506,7 @@ export default function PeopleSearchPage() {
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">{searchParams.companyDomains.length} domains</p>
+                  <p className="text-xs text-muted-foreground">{searchParams.companyDomains.length} valid domains</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -461,9 +515,16 @@ export default function PeopleSearchPage() {
                     <textarea
                       className="w-full h-24 p-2 border rounded-md resize-none text-sm"
                       placeholder="competitor.com&#10;exclude.com"
-                      value={searchParams.excludeDomains.join('\n')}
-                      onChange={(e) => handleTextareaChange('excludeDomains', e.target.value)}
+                      value={domainInput.excludeDomains}
+                      onChange={(e) => handleDomainChange('excludeDomains', e.target.value)}
                     />
+                    {domainValidationErrors.excludeDomains.length > 0 && (
+                      <div className="text-red-500 text-xs mt-1">
+                        {domainValidationErrors.excludeDomains.map((error, index) => (
+                          <p key={index}>{error}</p>
+                        ))}
+                      </div>
+                    )}
 
                     <div>
                       <Label className="block mb-2">Import CSV</Label>
