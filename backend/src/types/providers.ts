@@ -95,6 +95,13 @@ export interface PersonEnrichParams {
   firstName?: string;
   lastName?: string;
   companyDomain?: string;
+  companyName?: string;
+  include?: {
+    email?: boolean;
+    mobile?: boolean;
+    linkedInUrl?: boolean;
+    jobHistory?: boolean;
+  };
 }
 
 export interface CompanyEnrichParams {

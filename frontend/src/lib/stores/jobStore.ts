@@ -1,3 +1,5 @@
+// frontend/src/lib/stores/jobStore.ts
+// This file defines a Zustand store for managing job states in the application.
 import { create } from 'zustand';
 import { Job } from '@/types';
 

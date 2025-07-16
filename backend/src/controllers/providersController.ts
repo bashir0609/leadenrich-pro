@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { providerRegistry } from '../services/providers/ProviderRegistry';
+import { ProviderRegistry } from '../services/providers/ProviderRegistry';
 
 export const getProviders = (_req: Request, res: Response): void => {
-  const providers = providerRegistry.getAvailableProviders();
+  const providers = ProviderRegistry.getRegisteredProviders();
   res.status(200).json({ providers });
 };

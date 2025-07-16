@@ -1,3 +1,4 @@
+// frontend/src/lib/api/providers.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Provider } from '@/types';

@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto-js';
+import * as process from 'process';
+
 
 const prisma = new PrismaClient();
 
@@ -48,7 +50,24 @@ async function main() {
   console.log('🔌 Creating Surfe provider...');
   const surfe = await prisma.provider.upsert({
     where: { name: 'surfe' },
-    update: {},
+    update: {
+      baseUrl: 'https://api.surfe.com',
+      configuration: {
+        version: 'v2',
+        features: ['people', 'companies', 'enrichment', 'lookalike'],
+        timeout: 30000,
+        retryAttempts: 3,
+        asyncEnrichment: true, // Key addition - Surfe uses async enrichment
+        supportedOperations: [
+          'find-email',
+          'enrich-person',
+          'enrich-company',
+          'search-people',
+          'search-companies',
+          'find-lookalike'
+        ]
+      },
+    },
     create: {
       name: 'surfe',
       displayName: 'Surfe',
@@ -62,9 +81,18 @@ async function main() {
       isActive: true,
       configuration: {
         version: 'v2',
-        features: ['people', 'companies', 'enrichment'],
+        features: ['people', 'companies', 'enrichment', 'lookalike'],
         timeout: 30000,
         retryAttempts: 3,
+        asyncEnrichment: true,
+        supportedOperations: [
+          'find-email',
+          'enrich-person',
+          'enrich-company',
+          'search-people',
+          'search-companies',
+          'find-lookalike'
+        ]
       },
     },
   });
@@ -121,11 +149,11 @@ async function main() {
       category: 'search',
       endpoint: '/v2/people/search',
       httpMethod: 'POST',
-      creditsPerRequest: 5,
-      description: 'Search for people based on various criteria',
+      creditsPerRequest: 1, // Fixed: Surfe charges 1 credit for search
+      description: 'Search for people based on company, title, and other criteria',
       parameters: {
-        required: ['query'],
-        optional: ['location', 'company', 'title'],
+        required: [],
+        optional: ['companies', 'people', 'limit', 'pageToken'],
       },
     },
     {
@@ -134,11 +162,11 @@ async function main() {
       category: 'enrichment',
       endpoint: '/v2/people/enrich',
       httpMethod: 'POST',
-      creditsPerRequest: 2,
-      description: 'Enrich person data with additional information',
+      creditsPerRequest: 2, // Correct: 2 credits for enrichment
+      description: 'Enrich person data with email, phone, LinkedIn (async)',
       parameters: {
-        required: [],
-        optional: ['email', 'linkedInUrl', 'include'],
+        required: ['people'],
+        optional: ['include', 'notificationOptions'],
       },
     },
     {
@@ -147,11 +175,11 @@ async function main() {
       category: 'search',
       endpoint: '/v2/companies/search',
       httpMethod: 'POST',
-      creditsPerRequest: 5,
-      description: 'Search for companies',
+      creditsPerRequest: 1, // Fixed: 1 credit for search
+      description: 'Search for companies by industry, size, and location',
       parameters: {
-        required: ['query'],
-        optional: ['location', 'industry', 'size'],
+        required: [],
+        optional: ['filters', 'limit', 'pageToken'],
       },
     },
     {
@@ -160,11 +188,11 @@ async function main() {
       category: 'enrichment',
       endpoint: '/v2/companies/enrich',
       httpMethod: 'POST',
-      creditsPerRequest: 2,
-      description: 'Enrich company data',
+      creditsPerRequest: 3, // Fixed: 3 credits for company enrichment
+      description: 'Enrich company data with firmographics, funding (async)',
       parameters: {
-        required: [],
-        optional: ['domain', 'companyName'],
+        required: ['companies'],
+        optional: ['notificationOptions'],
       },
     },
     {
@@ -173,11 +201,11 @@ async function main() {
       category: 'lookalike',
       endpoint: '/v1/organizations/lookalikes',
       httpMethod: 'POST',
-      creditsPerRequest: 10,
-      description: 'Find companies similar to a given company',
+      creditsPerRequest: 5, // Fixed: 5 credits for lookalike
+      description: 'Find companies similar to given companies',
       parameters: {
-        required: ['companyDomain'],
-        optional: ['size', 'location', 'industry'],
+        required: [],
+        optional: ['domains', 'names', 'filters', 'maxResults'],
       },
     },
   ];

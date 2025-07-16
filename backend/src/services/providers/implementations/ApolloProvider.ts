@@ -111,7 +111,7 @@ export class ApolloProvider extends BaseProvider {
       default:
         throw new CustomError(
           ErrorCode.OPERATION_FAILED,
-          `Operation ${request.operation} not implemented for Apollo`,
+          `Operation ${request.operation} not implemented for Surfe`,
           501
         );
     }
