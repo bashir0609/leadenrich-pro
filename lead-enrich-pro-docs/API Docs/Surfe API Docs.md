@@ -86,6 +86,7 @@ fetch("https://api.surfe.com/v2/people/search", {
 
 ```
 
+# 2. API - Enrich People - Understanding Surfe's Asynchronous Split Request
 # 2.1. Enrich People (start)
 
 ```typescript
@@ -189,6 +190,100 @@ fetch("https://api.surfe.com/v2/people/enrich/<your-enrichment-id>", {
 
 ```
 
+- Typescript
+
+```typescript
+export interface Response {
+  /**
+   * EnrichmentID - ID of the enrichment action
+   */
+  enrichmentID?: string;
+  /**
+   * People - List of enriched people
+   */
+  people?: EnrichedPersonResponse[];
+  /**
+   * PercentCompleted - Percentage of completion of the enrichment action
+   * 0 means not started, 100 means completed
+   */
+  percentCompleted?: number;
+  /**
+   * Status - Status of the enrichment action
+   * Possible values are:
+   * * IN_PROGRESS - Enrichment is in progress
+   * * COMPLETED - Enrichment is completed
+   */
+  status?: ("IN_PROGRESS" | "COMPLETED" | "CANCELLED") & ("IN_PROGRESS" | "COMPLETED");
+}
+export interface EnrichedPersonResponse {
+  companyDomain?: string;
+  companyName?: string;
+  country?: string;
+  departments?: string[];
+  emails?: EnrichedPersonEmail[];
+  /**
+   * ExternalID - ID that will be returned as-is with the enrichment results
+   */
+  externalID?: string;
+  firstName?: string;
+  /**
+   * JobHistory - Job position's history
+   */
+  jobHistory?: JobPosition[];
+  jobTitle?: string;
+  lastName?: string;
+  linkedInUrl?: string;
+  location?: string;
+  mobilePhones?: EnrichedPersonMobilePhone[];
+  seniorities?: string[];
+  status?: "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+}
+export interface EnrichedPersonEmail {
+  email?: string;
+  /**
+   * ValidationStatus - Validation status of the email. Emails are always validated
+   * before being returned. This field indicates if the email is a catch-all email or not.
+   * Possible values are:
+   * * VALID - Email is valid and belong to a specific person. The delivery is certain and the engagement quality is high.
+   * * CATCH_ALL - Emails is valid but belong to a general mailbox. The delivery is less certain and the engagement quality is lower.
+   */
+  validationStatus?: "VALID" | " CATCH_ALL";
+}
+export interface JobPosition {
+  /**
+   * CompanyName - Name of the company that the person works at
+   */
+  companyName?: string;
+  /**
+   * EndDate - End date of the job position. Will be null on current positions.
+   */
+  endDate?: string;
+  /**
+   * JobTitle - Job title of the person
+   */
+  jobTitle?: string;
+  /**
+   * LinkedInURL - LinkedIn URL of the company that the person works at
+   */
+  linkedInURL?: string;
+  /**
+   * StartDate - Start date of the job position
+   */
+  startDate?: string;
+}
+export interface EnrichedPersonMobilePhone {
+  /**
+   * ConfidenceScore - Confidence score of the mobile phone.
+   * The score is between 0 and 1. A score of 1 means that the mobile phone is very likely to belong to the person.
+   */
+  confidenceScore?: number;
+  /**
+   * MobilePhone - Mobile phone number of the person.
+   * The phone number is in international format. For example, +33 6 12 34 56 78
+   */
+  mobilePhone?: string;
+}
+```
 # 3. Search Companies
 
 ```typescript
@@ -254,6 +349,7 @@ fetch("https://api.surfe.com/v2/companies/search", {
 
 ```
 
+# 4. API - Enrich Companies - Understanding Surfe's Asynchronous Split Request
 # 4.1 Enrich Companies (start)
 
 ```typescript
@@ -352,6 +448,75 @@ fetch("https://api.surfe.com/v2/companies/enrich/<string>", {
 }
 ```
 
+- Typescript
+```typescript
+export interface Response {
+  /**
+   * OrganizationID - ID of the enrichment action
+   */
+  companies?: EnrichedCompanyResponse[];
+  /**
+   * PercentCompleted - Percentage of completion of the enrichment action
+   * 0 means not started, 100 means completed
+   */
+  percentCompleted?: number;
+  /**
+   * Status - Status of the enrichment action
+   * Possible values are:
+   * - IN_PROGRESS
+   * - COMPLETED
+   */
+  status?: "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+}
+export interface EnrichedCompanyResponse {
+  description?: string;
+  digitalPresence?: EnrichedCompanyDigitalPresence[];
+  employeeCount?: number;
+  externalID?: string;
+  followersCountLinkedin?: number;
+  founded?: string;
+  fundingRounds?: EnrichedCompanyFundingRound[];
+  hqAddress?: string;
+  hqCountry?: string;
+  industry?: string;
+  ipo?: EnrichedCompanyIPO;
+  isPublic?: boolean;
+  keywords?: string[];
+  linkedInURL?: string;
+  name?: string;
+  parentOrganization?: EnrichedCompanyParentOrganization;
+  phones?: string[];
+  revenue?: string;
+  status?: "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  stocks?: EnrichedCompanyStock[];
+  subIndustry?: string;
+  websites?: string[];
+}
+export interface EnrichedCompanyDigitalPresence {
+  name?: string;
+  url?: string;
+}
+export interface EnrichedCompanyFundingRound {
+  amount?: number;
+  amountCurrency?: string;
+  announcedDate?: string;
+  leadInvestors?: string[];
+  name?: string;
+}
+export interface EnrichedCompanyIPO {
+  date?: string;
+  sharePrice?: number;
+  sharePriceCurrency?: string;
+}
+export interface EnrichedCompanyParentOrganization {
+  name?: string;
+  website?: string;
+}
+export interface EnrichedCompanyStock {
+  exchange?: string;
+  ticker?: string;
+}
+```
 
 # 5. Search Company lookalikes
 

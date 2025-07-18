@@ -1,5 +1,5 @@
 export class DataCleaningService {
-  static cleanEmail(email: string): string | null {
+  static cleanEmail(email: string | null | undefined): string | null {
     if (!email) return null;
     
     const cleaned = email.trim().toLowerCase();
@@ -8,33 +8,34 @@ export class DataCleaningService {
     return emailRegex.test(cleaned) ? cleaned : null;
   }
 
-  static cleanDomain(input: string): string | null {
+  static cleanDomain(input: string | null | undefined): string | null {
     if (!input) return null;
     
-    let domain = input.trim().toLowerCase();
+    let domain: string | undefined = input.trim().toLowerCase();
     
-    // Remove protocol
-    domain = domain.replace(/^https?:\/\//, '');
-    // Remove www
-    domain = domain.replace(/^www\./, '');
-    // Remove path
+    // The following checks satisfy the strict 'noUncheckedIndexedAccess' rule
     domain = domain.split('/')[0];
-    // Remove port
-    domain = domain.split(':')[0];
+    if (domain === undefined) return null;
+
+    domain = domain.split('?')[0];
+    if (domain === undefined) return null;
     
-    // Basic domain validation
-    const domainRegex = /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}$/;
+    domain = domain.split('#')[0];
+    if (domain === undefined) return null;
+
+    domain = domain.split(':')[0];
+    if (domain === undefined) return null;
+    
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9])+$/;
     
     return domainRegex.test(domain) ? domain : null;
   }
 
-  static cleanPhone(phone: string): string | null {
+  static cleanPhone(phone: string | null | undefined): string | null {
     if (!phone) return null;
     
-    // Remove all non-numeric characters
     const cleaned = phone.replace(/\D/g, '');
     
-    // Check if it's a valid length
     if (cleaned.length < 10 || cleaned.length > 15) {
       return null;
     }
@@ -42,7 +43,7 @@ export class DataCleaningService {
     return cleaned;
   }
 
-  static cleanName(name: string): string | null {
+  static cleanName(name: string | null | undefined): string | null {
     if (!name) return null;
     
     return name
@@ -53,21 +54,12 @@ export class DataCleaningService {
       .join(' ');
   }
 
-  static cleanCompanyName(company: string): string | null {
+  static cleanCompanyName(company: string | null | undefined): string | null {
     if (!company) return null;
     
-    // Remove common suffixes
     const suffixes = [
-      ', Inc.',
-      ' Inc.',
-      ', LLC',
-      ' LLC',
-      ', Ltd.',
-      ' Ltd.',
-      ', Corp.',
-      ' Corp.',
-      ', Corporation',
-      ' Corporation',
+      ', Inc.', ' Inc.', ', LLC', ' LLC', ', Ltd.', ' Ltd.',
+      ', Corp.', ' Corp.', ', Corporation', ' Corporation',
     ];
     
     let cleaned = company.trim();
@@ -80,11 +72,17 @@ export class DataCleaningService {
     return cleaned;
   }
 
-  static extractDomainFromEmail(email: string): string | null {
+  static extractDomainFromEmail(email: string | null | undefined): string | null {
     const cleaned = this.cleanEmail(email);
     if (!cleaned) return null;
     
     const parts = cleaned.split('@');
-    return parts.length === 2 ? parts[1] : null;
+
+    // This check satisfies the strict 'noUncheckedIndexedAccess' rule
+    if (parts.length === 2 && parts[1] !== undefined) {
+      return parts[1];
+    }
+    
+    return null;
   }
 }

@@ -1,3 +1,4 @@
+// backend/src/controllers/providersController.ts
 import { Request, Response } from 'express';
 import { ProviderRegistry } from '../services/providers/ProviderRegistry';
 

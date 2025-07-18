@@ -131,3 +131,20 @@ model SystemConfig {
 
   @@map("system_config")
 }
+
+// Add this User model to the end of your schema.prisma file
+
+// Replace your existing User model with this one
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String
+  name         String?
+  company      String?
+  role         String    @default("user")
+  apiKeyHash   String?   @unique
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

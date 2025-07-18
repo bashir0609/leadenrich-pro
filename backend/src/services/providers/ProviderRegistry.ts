@@ -1,3 +1,4 @@
+// 2. ENHANCED ProviderRegistry with better error handling
 import { BaseProvider } from './base/BaseProvider';
 import { ProviderConfig } from '@/types/providers';
 import { CustomError, ErrorCode } from '@/types/errors';
@@ -9,11 +10,15 @@ export class ProviderRegistry {
 
   // Register a provider class
   static register(providerId: string, providerClass: new (config: ProviderConfig) => BaseProvider): void {
-    if (this.providers.has(providerId)) {
-      logger.warn(`Provider ${providerId} is already registered. Overwriting.`);
+    const normalizedId = providerId.toLowerCase();
+    
+    if (this.providers.has(normalizedId)) {
+      logger.warn(`⚠️ Provider ${providerId} is already registered. Overwriting.`);
     }
-    this.providers.set(providerId, providerClass);
-    logger.info(`Provider ${providerId} registered successfully`);
+    
+    this.providers.set(normalizedId, providerClass);
+    logger.info(`✅ Provider ${providerId} registered successfully`);
+    logger.info(`📋 Total registered providers: ${this.providers.size}`);
   }
 
   // Get or create a provider instance
@@ -21,43 +26,57 @@ export class ProviderRegistry {
     providerId: string,
     config: ProviderConfig
   ): Promise<BaseProvider> {
+    const normalizedId = providerId.toLowerCase();
+    const instanceKey = `${normalizedId}_${config.id}`;
+    
+    logger.info(`🏭 ProviderRegistry: Getting instance for ${providerId} (normalized: ${normalizedId})`);
+
     // Check if instance already exists
-    if (this.instances.has(providerId)) {
-      return this.instances.get(providerId)!;
+    if (this.instances.has(instanceKey)) {
+      logger.info(`♻️ Reusing existing instance for ${providerId}`);
+      return this.instances.get(instanceKey)!;
     }
 
     // Get provider class
-    const ProviderClass = this.providers.get(providerId);
+    const ProviderClass = this.providers.get(normalizedId);
     if (!ProviderClass) {
+      const availableProviders = Array.from(this.providers.keys());
+      logger.error(`❌ Provider class not found: ${providerId} (${normalizedId})`);
+      logger.error(`📋 Available provider classes: ${availableProviders.join(', ')}`);
+      
       throw new CustomError(
         ErrorCode.PROVIDER_NOT_FOUND,
-        `Provider ${providerId} is not registered`,
+        `Provider ${providerId} is not registered. Available: ${availableProviders.join(', ')}`,
         404
       );
     }
+
+    logger.info(`🔧 Creating new instance of ${providerId}`);
 
     // Create new instance
     const instance = new ProviderClass(config);
     
     // Validate and authenticate if methods exist
-    if (typeof instance.validateConfig === 'function') {
-      instance.validateConfig();
-    }
-    
-    if (typeof instance.authenticate === 'function') {
-      await instance.authenticate();
+    try {
+      if (typeof instance.validateConfig === 'function') {
+        instance.validateConfig();
+        logger.info(`✅ Config validated for ${providerId}`);
+      }
+      
+      if (typeof instance.authenticate === 'function') {
+        await instance.authenticate();
+        logger.info(`✅ Authenticated ${providerId}`);
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to validate/authenticate ${providerId}:`, error);
+      // Don't throw here - some providers might not require immediate auth
     }
 
     // Cache instance
-    this.instances.set(providerId, instance);
+    this.instances.set(instanceKey, instance);
+    logger.info(`💾 Cached instance for ${providerId}`);
     
     return instance;
-  }
-
-  // Initialize providers from a configuration list
-  static initialize(providerConfigs: ProviderConfig[]): void {
-    logger.info(`Initializing providers: ${providerConfigs.map(p => p.name).join(', ')}`);
-    // This will be used by the ProviderFactory
   }
 
   static getRegisteredProviders(): string[] {
@@ -66,5 +85,15 @@ export class ProviderRegistry {
 
   static clearInstances(): void {
     this.instances.clear();
+    logger.info('🧹 Cleared all provider instances');
+  }
+
+  // Debug method
+  static getDebugInfo(): any {
+    return {
+      registeredClasses: Array.from(this.providers.keys()),
+      instanceCount: this.instances.size,
+      instances: Array.from(this.instances.keys()),
+    };
   }
 }

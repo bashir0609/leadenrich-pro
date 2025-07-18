@@ -210,6 +210,7 @@ export abstract class BaseProvider {
       [ProviderOperation.SEARCH_PEOPLE]: 5,
       [ProviderOperation.SEARCH_COMPANIES]: 5,
       [ProviderOperation.FIND_LOOKALIKE]: 10,
+      [ProviderOperation.CHECK_ENRICHMENT_STATUS]: 0, // No cost for status check
     };
     return creditMap[operation] || 1;
   }

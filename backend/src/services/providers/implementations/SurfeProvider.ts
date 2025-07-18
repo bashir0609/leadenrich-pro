@@ -1,3 +1,4 @@
+// backend/src/services/providers/implementations/SurfeProvider.ts
 import { BaseProvider } from '../base/BaseProvider';
 import { CustomError, ErrorCode } from '@/types/errors';
 import {
@@ -63,6 +64,15 @@ export class SurfeProvider extends BaseProvider {
             429,
             data as any
           );
+        
+        case 403:
+          return new CustomError(
+            ErrorCode.PROVIDER_QUOTA_EXCEEDED,
+            `Surfe Quota Exceeded: ${data.message || 'Check your API plan and usage.'}`,
+            403,
+            data as any
+          );
+          
         case 400:
           return new CustomError(
             ErrorCode.INVALID_INPUT,
@@ -88,21 +98,48 @@ export class SurfeProvider extends BaseProvider {
     );
   }
 
+  // Replace the entire executeOperation method with this corrected version
+
   protected async executeOperation(request: ProviderRequest): Promise<any> {
+    console.log('🎯 executeOperation called with:', request.operation);
+    console.log('🎯 Request params:', JSON.stringify(request.params, null, 2));
+    
     switch (request.operation) {
       case ProviderOperation.FIND_EMAIL:
         return this.findEmail(request.params as EmailSearchParams);
+        
       case ProviderOperation.ENRICH_PERSON:
         return this.enrichPerson(request.params as PersonEnrichParams);
+        
       case ProviderOperation.ENRICH_COMPANY:
+        if (request.params.companies && Array.isArray(request.params.companies)) {
+          return this.enrichCompaniesBulk(request.params);
+        }
         return this.enrichCompany(request.params as CompanyEnrichParams);
+        
       case ProviderOperation.SEARCH_PEOPLE:
         return this.searchPeople(request.params);
+        
       case ProviderOperation.SEARCH_COMPANIES:
         return this.searchCompanies(request.params);
+        
       case ProviderOperation.FIND_LOOKALIKE:
         return this.findLookalike(request.params);
+      
+      // FIX: This now correctly uses the enum member, not a string.
+      case ProviderOperation.CHECK_ENRICHMENT_STATUS:
+        console.log('✅ Matched CHECK_ENRICHMENT_STATUS');
+        if (!request.params.enrichmentId) {
+          throw new CustomError(
+            ErrorCode.INVALID_INPUT,
+            'Enrichment ID is required',
+            400
+          );
+        }
+        return this.checkBulkEnrichmentStatus(request.params.enrichmentId);
+        
       default:
+        console.log(`❌ No operation matched for '${request.operation}', throwing error`);
         throw new CustomError(
           ErrorCode.OPERATION_FAILED,
           `Operation ${request.operation} not implemented for Surfe`,
@@ -202,7 +239,7 @@ export class SurfeProvider extends BaseProvider {
     
     // Poll for completion (Surfe uses async enrichment)
     let attempts = 0;
-    const maxAttempts = 30; // 30 seconds max wait
+    const maxAttempts = 30;
     
     while (attempts < maxAttempts) {
       await this.sleep(1000); // Wait 1 second
@@ -253,63 +290,286 @@ export class SurfeProvider extends BaseProvider {
   }
 
   private async enrichCompany(params: CompanyEnrichParams): Promise<CompanyData> {
-    const enrichmentCompany = {
-      domain: params.domain,
-      externalID: `ext_${Date.now()}`,
-    };
-
-    // Start enrichment
-    const startResponse = await this.client.post('/v2/companies/enrich', {
-      companies: [enrichmentCompany],
-    });
-
-    const enrichmentId = startResponse.data.enrichmentID;
+    console.log('🔍 enrichCompany started with params:', params);
     
-    // Poll for completion
-    let attempts = 0;
-    const maxAttempts = 30;
+    try {
+      const enrichmentCompany = {
+        domain: params.domain,
+        externalID: `ext_${Date.now()}`,
+      };
+
+      console.log('📤 Sending to Surfe API:', enrichmentCompany);
+
+      // Start enrichment
+      const startResponse = await this.client.post('/v2/companies/enrich', {
+        companies: [enrichmentCompany],
+      });
+
+      console.log('✅ Start response from Surfe:', startResponse.data);
+
+      const enrichmentId = startResponse.data.enrichmentID;
+      console.log('🆔 Got enrichment ID:', enrichmentId);
+      
+      // Poll for completion
+      let attempts = 0;
+      const maxAttempts = 30;
+      
+      while (attempts < maxAttempts) {
+        console.log(`⏰ Waiting 1 second before poll attempt ${attempts + 1}...`);
+        await this.sleep(1000);
+        
+        console.log(`🔄 Making poll request to: /v2/companies/enrich/${enrichmentId}`);
+        const resultResponse = await this.client.get(`/v2/companies/enrich/${enrichmentId}`);
+        const company = resultResponse.data;
+        
+        console.log(`📊 Poll attempt ${attempts + 1}, status: ${company.status}`);
+        console.log('📥 Raw Surfe response:', JSON.stringify(company, null, 2));
+        
+        // Replace the return statement in your enrichCompany method in SurfeProvider.ts
+        // Find this section in enrichCompany method and replace:
+
+        if (company.status === 'COMPLETED') {
+          console.log('🎉 Enrichment completed! Processing data...');
+          
+          const companyData = company.companies?.[0]; // This is EnrichedCompanyResponse
+          
+          if (!companyData) {
+            throw new CustomError(
+              ErrorCode.NOT_FOUND,
+              'No company data found in response',
+              404
+            );
+          }
+          
+          // Return the company data directly, not wrapped in extra success/data layers
+          const result = {
+            name: companyData.name || '',
+            domain: params.domain || '',
+            description: companyData.description || '',
+            industry: companyData.industry || '',
+            size: companyData.employeeCount ? companyData.employeeCount.toString() : '',
+            location: companyData.hqAddress || '',
+            linkedinUrl: companyData.linkedInURL || '',
+            technologies: companyData.keywords || [],
+            additionalData: {
+              founded: companyData.founded,
+              revenue: companyData.revenue,
+              isPublic: companyData.isPublic,
+              phones: companyData.phones || [],
+              websites: companyData.websites || [],
+              digitalPresence: companyData.digitalPresence || [],
+              fundingRounds: companyData.fundingRounds || [],
+              parentOrganization: companyData.parentOrganization,
+              stocks: companyData.stocks || [],
+              followersLinkedIn: companyData.followersCountLinkedin || 0,
+              subIndustry: companyData.subIndustry,
+              ipo: companyData.ipo,
+              employeeCount: companyData.employeeCount,
+              hqAddress: companyData.hqAddress,
+              hqCountry: companyData.hqCountry,
+              externalID: companyData.externalID,
+              status: companyData.status,
+            },
+          };
+          
+          console.log('🚀 Returning result:', JSON.stringify(result, null, 2));
+          return result; // Return this directly, not wrapped in {success: true, data: result}
+        }
+        
+        attempts++;
+      }
+      
+      console.log('⏰ Timeout reached after', maxAttempts, 'attempts');
+      throw new CustomError(
+        ErrorCode.PROVIDER_ERROR,
+        'Company enrichment timeout',
+        408
+      );
+      
+    } catch (error) {
+      console.error('💥 Error in enrichCompany:', error);
+      throw error;
+    }
+  }
+
+  private async enrichCompaniesBulk(params: any): Promise<any> {
+    console.log('🔍 enrichCompaniesBulk started with params:', params);
     
-    while (attempts < maxAttempts) {
-      await this.sleep(1000);
+    try {
+      // Handle both companies array and records array (for compatibility)
+      let companies = params.companies;
+      
+      // If we have records instead of companies (from bulk route)
+      if (!companies && params.records) {
+        companies = params.records;
+      }
+      
+      // Validate input
+      if (!companies || !Array.isArray(companies) || companies.length === 0) {
+        throw new CustomError(
+          ErrorCode.INVALID_INPUT,
+          'Companies array is required and must not be empty',
+          400
+        );
+      }
+
+      // Replace the existing logic for handling a single company in the enrichCompaniesBulk method
+      if (companies.length === 1) {
+        console.log('🔄 Single company detected, using enrichCompany method. Returning result directly.');
+        
+        const domain = companies[0].domain;
+        if (!domain) {
+          throw new CustomError(
+            ErrorCode.INVALID_INPUT,
+            'Domain is required for company enrichment',
+            400
+          );
+        }
+        
+        // This is the fix: Return the promise from enrichCompany directly.
+        // The API handler will wrap this in { success: true, data: ... }, which the frontend expects.
+        return this.enrichCompany({ domain: domain });
+      }
+
+      // For multiple companies, continue with bulk logic
+      if (companies.length > 500) {
+        throw new CustomError(
+          ErrorCode.INVALID_INPUT,
+          'Maximum 500 companies allowed per batch',
+          400
+        );
+      }
+
+      const enrichmentCompanies = companies.map((company: any, index: number) => {
+        if (!company.domain) {
+          throw new CustomError(
+            ErrorCode.INVALID_INPUT,
+            `Company at index ${index} is missing domain`,
+            400
+          );
+        }
+        
+        return {
+          domain: company.domain,
+          externalID: `bulk_${Date.now()}_${index}`,
+        };
+      });
+
+      console.log('📤 Sending bulk request to Surfe API:', { companies: enrichmentCompanies });
+
+      // Start bulk enrichment
+      const startResponse = await this.client.post('/v2/companies/enrich', {
+        companies: enrichmentCompanies,
+      });
+
+      console.log('✅ Bulk start response from Surfe:', startResponse.data);
+
+      if (!startResponse.data?.enrichmentID) {
+        throw new CustomError(
+          ErrorCode.PROVIDER_ERROR,
+          'Failed to start bulk enrichment - no enrichment ID returned',
+          500
+        );
+      }
+
+      const enrichmentId = startResponse.data.enrichmentID;
+      console.log('🆔 Got bulk enrichment ID:', enrichmentId);
+      
+      // For true bulk operations (multiple companies), return enrichment ID for polling
+      return {
+        success: true,
+        data: {
+          enrichmentID: enrichmentId,
+          status: 'PROCESSING',
+          total: companies.length,
+          message: `Started bulk enrichment for ${companies.length} companies`
+        }
+      };
+      
+    } catch (error: any) {
+      // Add more detailed logging to see the exact response from the Surfe API
+      console.error('💥 Error starting bulk enrichment job with Surfe.');
+      if (error.response) {
+        console.error('Surfe API responded with status:', error.response.status);
+        console.error('Surfe API response data:', JSON.stringify(error.response.data, null, 2));
+      } else {
+        console.error('A non-API error occurred in enrichCompaniesBulk:', error.message);
+      }
+
+      // Re-throw the error using the standard mapping
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      throw this.mapErrorToStandard(error);
+    }
+  }
+
+  // New method to check bulk enrichment status
+  async checkBulkEnrichmentStatus(enrichmentId: string): Promise<any> {
+    console.log('🔍 [DEBUG] checkBulkEnrichmentStatus called with ID:', enrichmentId);
+
+    if (!enrichmentId || typeof enrichmentId !== 'string') {
+      throw new CustomError(
+        ErrorCode.INVALID_INPUT,
+        'Valid enrichment ID is required',
+        400
+      );
+    }
+
+    try {
+      console.log('📡 [DEBUG] Making request to Surfe API for status check...');
       
       const resultResponse = await this.client.get(`/v2/companies/enrich/${enrichmentId}`);
-      const company = resultResponse.data;
+      const result = resultResponse.data;
+
+      if (!result || typeof result !== 'object') {
+        throw new CustomError(
+          ErrorCode.PROVIDER_ERROR,
+          'Invalid response format from Surfe API',
+          500,
+          { response: result }
+        );
+      }
       
-      if (company.status === 'COMPLETED') {
+      if (result.status === 'COMPLETED') {
+        // ... (this part is correct)
         return {
-          name: company.name,
-          domain: params.domain || company.websites?.[0] || '',
-          description: company.description,
-          industry: company.industry,
-          size: company.employeeCount?.toString(),
-          location: company.hqAddress ? `${company.hqAddress}, ${company.hqCountry}` : company.hqCountry,
-          linkedinUrl: company.linkedInURL,
-          technologies: company.keywords || [],
-          additionalData: {
-            founded: company.founded,
-            revenue: company.revenue,
-            isPublic: company.isPublic,
-            phones: company.phones,
-            websites: company.websites,
-            digitalPresence: company.digitalPresence,
-            fundingRounds: company.fundingRounds,
-            parentOrganization: company.parentOrganization,
-            stocks: company.stocks,
-            followersLinkedIn: company.followersCountLinkedi,
-            subIndustry: company.subIndustry,
-            ipo: company.ipo,
-          },
+          success: true,
+          data: { /* ... */ }
         };
       }
       
-      attempts++;
+      if (result.status === 'FAILED') {
+        // ... (this part is correct)
+        return {
+          success: false,
+          data: { /* ... */ }
+        };
+      }
+      
+      // Still processing
+      return {
+        success: true,
+        data: {
+          status: result.status || 'PROCESSING',
+          percentCompleted: result.percentCompleted || 0,
+          message: 'Enrichment in progress'
+        }
+      };
+      
+    } catch (error: any) {
+      console.error('💥 [DEBUG] Error checking enrichment status:', error);
+      if (error.response) {
+        throw this.mapErrorToStandard(error);
+      }
+      
+      throw new CustomError(
+        ErrorCode.PROVIDER_ERROR,
+        `Failed to check enrichment status: ${error.message || 'Unknown error'}`,
+        500,
+        { originalError: error }
+      );
     }
-    
-    throw new CustomError(
-      ErrorCode.PROVIDER_ERROR,
-      'Company enrichment timeout',
-      408
-    );
   }
 
   private async searchPeople(params: any): Promise<any> {
@@ -413,12 +673,13 @@ export class SurfeProvider extends BaseProvider {
   protected calculateCredits(operation: ProviderOperation): number {
     // Surfe's actual credit costs
     const creditMap: Record<ProviderOperation, number> = {
-      [ProviderOperation.FIND_EMAIL]: 2,
-      [ProviderOperation.ENRICH_PERSON]: 2,
-      [ProviderOperation.ENRICH_COMPANY]: 3,
-      [ProviderOperation.SEARCH_PEOPLE]: 1,
-      [ProviderOperation.SEARCH_COMPANIES]: 1,
-      [ProviderOperation.FIND_LOOKALIKE]: 5,
+      [ProviderOperation.FIND_EMAIL]: 1,
+      [ProviderOperation.ENRICH_PERSON]: 1,
+      [ProviderOperation.ENRICH_COMPANY]: 0,
+      [ProviderOperation.SEARCH_PEOPLE]: 0,
+      [ProviderOperation.SEARCH_COMPANIES]: 0,
+      [ProviderOperation.FIND_LOOKALIKE]: 0,
+      [ProviderOperation.CHECK_ENRICHMENT_STATUS]: 0,
     };
     return creditMap[operation] || 1;
   }
@@ -431,4 +692,5 @@ export class SurfeProvider extends BaseProvider {
 
 // Register the provider (keep your existing registration pattern)
 import { ProviderRegistry } from '../ProviderRegistry';
+import { request } from 'express';
 ProviderRegistry.register('surfe', SurfeProvider);

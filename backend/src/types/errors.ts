@@ -1,3 +1,4 @@
+// backend/src/types/errors.ts
 export enum ErrorCode {
   // System Errors
   INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
@@ -17,6 +18,7 @@ export enum ErrorCode {
   PROVIDER_ERROR = 'PROVIDER_ERROR',
   PROVIDER_NOT_FOUND = 'PROVIDER_NOT_FOUND',
   PROVIDER_RATE_LIMIT = 'PROVIDER_RATE_LIMIT',
+  PROVIDER_QUOTA_EXCEEDED = 'PROVIDER_QUOTA_EXCEEDED'
 }
 
 export interface ErrorDetails {

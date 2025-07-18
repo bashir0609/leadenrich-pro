@@ -43,6 +43,8 @@ export class ProviderFactory {
               return ProviderOperation.FIND_EMAIL;
             case 'lookalike':
               return ProviderOperation.FIND_LOOKALIKE;
+            case 'check-enrichment-status':
+              return ProviderOperation.CHECK_ENRICHMENT_STATUS;
             default:
               return undefined;
           }

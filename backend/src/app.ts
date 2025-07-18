@@ -14,9 +14,27 @@ import { jobsRouter } from './routes/jobs';
 import { uploadRouter } from './routes/upload';
 import { exportRouter } from './routes/export';
 import { setupSocket } from './config/socket';
+import { ProviderRegistry } from './services/providers/ProviderRegistry';
+
+// Enhanced provider initialization
+logger.info('🔌 Initializing providers...');
+
+// Import all provider implementations to trigger registration
 import './services/providers/implementations/SurfeProvider';
 import './services/providers/implementations/ApolloProvider';
 import './services/providers/implementations/BetterEnrichProvider';
+
+// Log what got registered
+setTimeout(() => {
+  const registeredProviders = ProviderRegistry.getRegisteredProviders();
+  logger.info(`📋 Registered providers: ${registeredProviders.join(', ')}`);
+  
+  if (registeredProviders.length === 0) {
+    logger.error('❌ No providers registered! Check your provider imports.');
+  } else {
+    logger.info(`✅ ${registeredProviders.length} providers registered successfully`);
+  }
+}, 100);
 
 // Load environment variables
 dotenv.config();

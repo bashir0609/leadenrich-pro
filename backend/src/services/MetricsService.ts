@@ -124,7 +124,6 @@ export class MetricsService {
       },
       _sum: {
         creditsUsed: true,
-        requestsCount: true,
       },
     });
 

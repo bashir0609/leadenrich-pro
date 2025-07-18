@@ -1,3 +1,4 @@
+// frontend/src/app/providers/[name]/company-search/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,6 +17,7 @@ import { useProviderStore } from '@/lib/stores/providerStore';
 import { useProviders } from '@/lib/api/providers';
 import { useExecuteProvider } from '@/lib/api/providers';
 import { DataCleaningService } from '@/utils/dataCleaning';
+import axios from 'axios';
 
 // TypeScript interfaces with enhanced typing
 interface CompanySearchFilters {
@@ -162,76 +164,108 @@ export default function CompanySearchPage() {
 
   // Company Search Handler
   const handleCompanySearch = async () => {
-    // Validate provider selection
+  // Validate provider selection
+  if (!selectedProvider) {
+    toast.error('Please select a provider before searching');
+    return;
+  }
+  
+  // Validate domain input
+  const cleanedDomains = searchParams.domains
+    .map(domain => DataCleaningService.cleanDomain(domain))
+    .filter((domain): domain is string => domain !== null);
+
+  const cleanedExcludedDomains = searchParams.domainsExcluded
+    .map(domain => DataCleaningService.cleanDomain(domain))
+    .filter((domain): domain is string => domain !== null);
+
+  // Add search criteria validation HERE
+  const hasSearchCriteria = 
+    cleanedDomains.length > 0 ||
+    cleanedExcludedDomains.length > 0 ||
+    searchParams.industries.length > 0 ||
+    searchParams.countries.length > 0 ||
+    searchParams.minEmployees !== '' ||
+    searchParams.maxEmployees !== '' ||
+    searchParams.minRevenue !== '' ||
+    searchParams.maxRevenue !== '';
+
+  if (!hasSearchCriteria) {
+    toast.error('Please provide at least one search filter');
+    return;
+  }
+
+  setIsSearchLoading(true);
+
+  try {
     if (!selectedProvider) {
-      toast.error('Please select a provider before searching');
-      return;
-    }
-    
-    // Validate domain input
-    const cleanedDomains = searchParams.domains
-      .map(domain => DataCleaningService.cleanDomain(domain))
-      .filter((domain): domain is string => domain !== null);
-
-    const cleanedExcludedDomains = searchParams.domainsExcluded
-      .map(domain => DataCleaningService.cleanDomain(domain))
-      .filter((domain): domain is string => domain !== null);
-
-    // Prepare search filters
-    const filters: CompanySearchFilters = {};
-
-    if (cleanedDomains.length > 0) filters.domains = cleanedDomains;
-    if (cleanedExcludedDomains.length > 0) filters.domainsExcluded = cleanedExcludedDomains;
-    
-    if (searchParams.industries.length > 0) {
-      filters.industries = searchParams.industries.map(ind => ind.trim());
-    }
-    
-    if (searchParams.countries.length > 0) {
-      filters.countries = searchParams.countries.map(country => country.trim().toUpperCase());
-    }
-    
-    if (searchParams.minEmployees || searchParams.maxEmployees) {
-      filters.employeeCount = {
-        from: parseInt(searchParams.minEmployees) || 1,
-        to: parseInt(searchParams.maxEmployees) || 999999999
-      };
-    }
-    
-    if (searchParams.minRevenue || searchParams.maxRevenue) {
-      filters.revenue = {
-        from: parseInt(searchParams.minRevenue) || 1,
-        to: parseInt(searchParams.maxRevenue) || 999999999
-      };
-    }
-
-    // Validate input
-    if (Object.keys(filters).length === 0) {
-      toast.error('Please provide at least one search filter');
+      toast.error('No provider selected');
+      setIsSearchLoading(false);
       return;
     }
 
-    setIsSearchLoading(true);
+    // Comprehensive debugging payload
+    const payload = {
+      providerId: selectedProvider.name,
+      operation: 'search-companies',
+      params: {
+        domains: cleanedDomains,
+        excludedDomains: cleanedExcludedDomains,
+        industries: searchParams.industries,
+        countries: searchParams.countries,
+        employeeCountMin: searchParams.minEmployees 
+          ? parseInt(searchParams.minEmployees) 
+          : undefined,
+        employeeCountMax: searchParams.maxEmployees 
+          ? parseInt(searchParams.maxEmployees) 
+          : undefined,
+        revenueMin: searchParams.minRevenue 
+          ? parseInt(searchParams.minRevenue) 
+          : undefined,
+        revenueMax: searchParams.maxRevenue 
+          ? parseInt(searchParams.maxRevenue) 
+          : undefined,
+        limit: Math.min(Math.max(1, searchParams.limit), 200),
+        pageToken: pagination.nextPageToken || ''
+      }
+    };
+
+    // Remove undefined values
+    const cleanedParams = Object.fromEntries(
+      Object.entries(payload.params).filter(([_, value]) => 
+        value !== undefined && 
+        (Array.isArray(value) ? value.length > 0 : true)
+      )
+    );
+
+    // Updated payload with cleaned params
+    const finalPayload = {
+      providerId: selectedProvider.name,
+      operation: 'search-companies',
+      params: cleanedParams
+    };
+
+    console.log('Final Payload:', finalPayload);
+
+    // Extensive logging
+    console.group('Company Search Debug');
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+    console.log('Selected Provider:', selectedProvider);
+    console.log('Search Params:', searchParams);
+    console.log('Cleaned Domains:', cleanedDomains);
+    console.log('Cleaned Excluded Domains:', cleanedExcludedDomains);
+    console.groupEnd();
 
     try {
-      if (!selectedProvider) {
-        toast.error('No provider selected');
-        setIsSearchLoading(false);
-        return;
-      }
+      const result = await executeProvider.mutateAsync(finalPayload);
 
-      const result = await executeProvider.mutateAsync({
-        providerId: selectedProvider.name,
-        data: {
-          operation: 'search-companies',
-          params: {
-            domains: cleanedDomains,
-            filters,
-            limit: Math.min(Math.max(1, searchParams.limit), 200),
-            pageToken: pagination.nextPageToken || ''
-          }
-        },
-      } as any); // Cast to any to bypass type error if needed
+      // More detailed result logging
+      console.group('Search Result');
+      console.log('Raw Result:', result);
+      console.log('Success:', result.success);
+      console.log('Data:', result.data);
+      console.log('Error:', result.error);
+      console.groupEnd();
 
       // Process search results
       if (result.success && result.data?.companies) {
@@ -246,16 +280,53 @@ export default function CompanySearchPage() {
 
         toast.success(`Found ${searchResponse.total || searchResponse.companies.length} companies`);
       } else {
-        toast.error('No companies found');
+        // More detailed error handling
+        const errorMessage = result.error?.message || 'No companies found';
+        toast.error(errorMessage);
         setCompanyResults([]);
       }
-    } catch (error) {
-      toast.error('Company search failed');
-      console.error(error);
-    } finally {
-      setIsSearchLoading(false);
+    } catch (mutationError: any) {
+      // Axios or other mutation-specific error handling
+      console.group('Mutation Error');
+      console.error('Mutation Error:', mutationError);
+      
+      // Check if it looks like an AxiosError
+      const isAxiosError = mutationError.isAxiosError === true;
+
+      if (isAxiosError) {
+        console.log('Axios Error Details:', {
+          response: mutationError.response?.data,
+          status: mutationError.response?.status,
+          headers: mutationError.response?.headers
+        });
+
+        // More specific error messages
+        if (mutationError.response) {
+          // The request was made and the server responded with a status code
+          toast.error(`API Error: ${mutationError.response.status} - ${JSON.stringify(mutationError.response.data)}`);
+        } else if (mutationError.request) {
+          // The request was made but no response was received
+          toast.error('No response received from server');
+        } else {
+          // Something happened in setting up the request
+          toast.error(`Error: ${mutationError.message}`);
+        }
+      } else {
+        // Non-Axios error
+        toast.error(`Search failed: ${mutationError.message}`);
+      }
+      console.groupEnd();
     }
-  };
+  } catch (error) {
+    console.group('Unexpected Error');
+    console.error('Unexpected Error:', error);
+    console.groupEnd();
+
+    toast.error('An unexpected error occurred during company search');
+  } finally {
+    setIsSearchLoading(false);
+  }
+};
 
   // Export Results to CSV
   const handleExport = () => {

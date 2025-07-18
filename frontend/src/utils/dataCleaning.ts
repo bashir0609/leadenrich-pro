@@ -1,49 +1,52 @@
-// src/utils/dataCleaning.ts
+// Replace the entire content of this file with the corrected version
 export class DataCleaningService {
-  static cleanDomain(input: string): string | null {
+  static cleanDomain(input: string | null | undefined): string | null {
     if (!input) return null;
-   
-    // Remove whitespace and convert to lowercase
+    
     let domain = input.trim().toLowerCase();
-   
-    // Remove common prefixes
-    domain = domain
-      .replace(/^https?:\/\//, '')  // Remove http:// or https://
-      .replace(/^www\./, '')        // Remove www.
-      .split('/')[0]                // Remove any path after domain
-      .split(':')[0];               // Remove port if present
-   
-    // Simple domain validation 
-    const domainRegex = /^[a-z0-9]+([.-][a-z0-9]+)*\.[a-z]{2,}$/;
-   
+    
+    // Remove protocol
+    domain = domain.replace(/^https?:\/\//, '');
+    // Remove www
+    domain = domain.replace(/^www\./, '');
+    // Remove path, query params, and fragments
+    domain = domain.split('/')[0].split('?')[0].split('#')[0];
+    // Remove port
+    domain = domain.split(':')[0];
+    
+    // Use the more robust regex for validation
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9])+$/;
+    
     return domainRegex.test(domain) ? domain : null;
   }
 
-  // New method to help users understand why a domain is invalid
+  // This method now gives more specific feedback
   static validateDomainFeedback(input: string): { 
     isValid: boolean; 
-    message?: string 
+    cleaned: string | null;
+    message?: string;
   } {
-    if (!input) return { isValid: false, message: 'Domain cannot be empty' };
+    if (!input || !input.trim()) {
+      return { isValid: false, cleaned: null, message: 'Row was empty' };
+    }
     
-    const domain = input.trim().toLowerCase();
-    
-    if (domain.includes(' ')) 
-      return { isValid: false, message: 'Domain should not contain spaces' };
-    
-    if (domain.includes('http://') || domain.includes('https://'))
-      return { isValid: false, message: 'Remove http:// or https://' };
-    
-    if (domain.includes('www.'))
-      return { isValid: false, message: 'Remove www.' };
-    
-    const cleanedDomain = this.cleanDomain(domain);
-    
-    return cleanedDomain 
-      ? { isValid: true } 
-      : { 
-          isValid: false, 
-          message: 'Invalid domain format. Use format like example.com' 
-        };
+    const originalDomain = input.trim();
+    let cleanedDomain = originalDomain.toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0].split('?')[0].split('#')[0]
+      .split(':')[0];
+
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9])+$/;
+
+    if (domainRegex.test(cleanedDomain)) {
+      return { isValid: true, cleaned: cleanedDomain };
+    }
+
+    // Provide specific feedback if validation fails
+    if (originalDomain.includes(' ')) {
+      return { isValid: false, cleaned: null, message: 'Domain contained spaces' };
+    }
+    return { isValid: false, cleaned: null, message: 'Invalid domain format' };
   }
 }

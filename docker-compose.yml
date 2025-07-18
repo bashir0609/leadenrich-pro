@@ -1,6 +1,47 @@
-version: '1'
+# Using a modern version for better features
+version: '3.8'
 
 services:
+  # --- APPLICATION SERVICES ---
+  
+  backend:
+    # This tells Docker to build the image from the Dockerfile in your ./backend directory
+    build: ./backend
+    container_name: leadenrich_backend
+    restart: unless-stopped
+    ports:
+      # Exposes the backend's port 8000 to your machine's port 8000
+      - "8000:8000"
+    environment:
+      # --- IMPORTANT: Use service names, not 'localhost' ---
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: leadenrich
+      POSTGRES_PASSWORD: leadenrich_dev_2024
+      POSTGRES_DB: leadenrich_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: leadenrich_redis_2024
+    depends_on:
+      # This makes the backend wait until the databases are healthy before starting
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    # This tells Docker to build the image from the Dockerfile in your ./frontend directory
+    build: ./frontend
+    container_name: leadenrich_frontend
+    restart: unless-stopped
+    ports:
+      # Exposes the Next.js port 3000
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  # --- DATABASE SERVICES (from your file) ---
+
   postgres:
     image: postgres:15-alpine
     container_name: leadenrich_postgres
@@ -29,7 +70,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "leadenrich_redis_2024", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
