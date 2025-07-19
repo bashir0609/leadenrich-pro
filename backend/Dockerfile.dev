@@ -1,0 +1,23 @@
+# This Dockerfile is optimized for development with hot-reloading.
+FROM node:18-alpine
+
+# Install bash and openssl. Bash is for the wait-for-it script,
+# and openssl is required by Prisma for some database connections.
+RUN apk add --no-cache bash openssl
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy package files to leverage Docker cache
+COPY package.json package-lock.json* ./
+
+# Install all dependencies, including devDependencies like nodemon
+RUN npm install
+
+# Make the wait-for-it script executable
+COPY ./scripts/wait-for-it.sh ./scripts/wait-for-it.sh
+RUN chmod +x ./scripts/wait-for-it.sh
+
+# The command to run will be specified in the docker-compose.override.yml
+# This keeps the Dockerfile generic.
+CMD ["npm", "run", "dev"]

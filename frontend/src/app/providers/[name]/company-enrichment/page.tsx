@@ -15,8 +15,8 @@ import Papa from 'papaparse';
 
 // Import necessary hooks and services
 import { useProviderStore } from '@/lib/stores/providerStore';
-import { useProviders } from '@/lib/api/providers';
-import { useExecuteProvider } from '@/lib/api/providers';
+import { useExecuteProvider, useProviders, useCreateBulkJob } from '@/lib/api/providers';
+import { useJobStatus } from '@/lib/api/jobs'; // Import the job status hook
 import { DataCleaningService } from '@/utils/dataCleaning';
 import { FileUpload } from '@/components/common/FileUpload';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,6 +47,7 @@ interface Stock {
 }
 
 interface CompanyEnrichmentResponse {
+  domain: string;
   description: string;
   digitalPresence: DigitalPresence[];
   employeeCount: number;
@@ -252,6 +253,7 @@ export default function CompanyEnrichmentPage() {
 
     return {
       name: safeGet(companyData.name, 'Unknown Company'),
+      domain: safeGet(companyData.domain || companyData.additionalData?.websites?.[0], ''),
       description: safeGet(companyData.description, 'No description available'),
       industry: safeGet(companyData.industry, 'Unknown Industry'),
       subIndustry: safeGet(companyData.additionalData?.subIndustry, ''),
@@ -323,7 +325,7 @@ export default function CompanyEnrichmentPage() {
       // Find this section and replace it with this corrected version:
 
       if (result.success && result.data) {
-        const companyData = result.data;
+        const companyData = Array.isArray(result.data) ? result.data[0] : result.data;
         
       if (companyData) {
           // Use the reusable helper function for consistency
@@ -449,7 +451,7 @@ export default function CompanyEnrichmentPage() {
 
     setIsLoading(true);
     setError(null);
-    setBulkResults([]); // Clear previous results
+    setBulkResults([]);
 
     try {
       const bulkEnrichmentPayload = {
@@ -460,52 +462,30 @@ export default function CompanyEnrichmentPage() {
         }
       };
 
-      console.log(`📤 Starting bulk enrichment for ${bulkDomains.length} domains:`, bulkEnrichmentPayload);
-      const bulkResult = await executeProvider.mutateAsync(bulkEnrichmentPayload);
-      console.log('📥 Bulk enrichment result:', bulkResult);
+      console.log(`📤 Sending bulk request for ${bulkDomains.length} domains...`);
+      const result = await executeProvider.mutateAsync(bulkEnrichmentPayload);
+      console.log('📥 Received final bulk result from backend:', result);
 
-      if (!bulkResult.success) {
-        throw new Error(bulkResult.error?.message || bulkResult.message || 'Bulk enrichment failed');
-      }
-
-      const providerData = bulkResult.data;
-
-      // Scenario 1: Backend returned a single, resolved company object directly.
-      // This is the new path for bulk requests with 1 company.
-      if (providerData && providerData.domain) {
-          console.log('✅ Got immediate completed result for a single company in bulk flow');
-          setBulkResults([providerData]); // The results state expects an array.
-          setIsLoading(false);
-          toast.success('Enrichment completed for 1 company.');
-          return;
-      }
-
-      // Scenario 2: Backend returned a bulk response object for polling.
-      // This is the path for bulk requests with > 1 company.
-      const nestedData = providerData?.data; 
-      const enrichmentId = nestedData?.enrichmentID;
-
-      if (enrichmentId) {
-          console.log('✅ Got enrichment ID:', enrichmentId, 'Starting polling...');
-          setEnrichmentId(enrichmentId);
-          toast.success(`Started enrichment for ${bulkDomains.length} companies`);
-          pollBulkEnrichmentResults(enrichmentId);
+      if (result.success && result.data) {
+        // The backend now returns the final, complete array of results directly.
+        setBulkResults(result.data.map(mapCompanyDataToResponse));
+        toast.success(`Enrichment complete! Found data for ${result.data.length} companies.`);
       } else {
-          console.error('❌ No enrichment ID or immediate results found');
-          throw new Error('No enrichment ID received from bulk enrichment');
+        throw new Error(result.error?.message || 'Bulk enrichment failed');
       }
 
     } catch (error) {
       console.error('💥 Bulk enrichment error:', error);
       handleError(error, 'bulk enrichment');
-      setIsLoading(false); // Ensure loading is stopped on error
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Replace the entire pollBulkEnrichmentResults function
   const pollBulkEnrichmentResults = async (enrichmentId: string) => {
     console.log('🔄 Starting polling for enrichment ID:', enrichmentId);
-    const maxAttempts = 120; // 10 minute timeout
+    const maxAttempts = 120; // 10 minute timeout (120 attempts * 5 seconds)
     let attempts = 0;
 
     const poll = async () => {
@@ -529,10 +509,23 @@ export default function CompanyEnrichmentPage() {
           params: { enrichmentId }
         });
 
-        console.log('📥 Status result:', statusResult);
+        // Add detailed logging to see the exact response from the backend
+        console.log('📥 Raw status result from backend:', JSON.stringify(statusResult, null, 2));
 
         if (statusResult.success && statusResult.data) {
-          const { status, companies, percentCompleted } = statusResult.data;
+          // FIX: Robustly unwrap the nested data structure from the backend.
+          // The backend response is nested as { success, data: { success, data: { status, ... } } }
+          const responseData = statusResult.data.data ? statusResult.data.data : statusResult.data;
+          
+          // Check if the unwrapped data has the properties we need
+          if (typeof responseData.status === 'undefined') {
+            console.error("❌ Polling response is missing 'status' field. Full response:", responseData);
+            throw new Error('Invalid polling response format from server.');
+          }
+
+          const { status, companies, percentCompleted } = responseData;
+
+          console.log(`✅ Parsed status: ${status}, Percent: ${percentCompleted}`);
 
           setBulkEnrichmentStatus({
             status: status,
@@ -544,7 +537,7 @@ export default function CompanyEnrichmentPage() {
           if (status === 'COMPLETED') {
             console.log('🎉 Bulk enrichment completed!', companies?.length || 0, 'companies enriched');
             
-            // FIX: Map the nested backend data to the flat UI-ready format
+            // Map the nested backend data to the flat UI-ready format
             setBulkResults((companies || []).map(mapCompanyDataToResponse));
             
             setIsLoading(false);
@@ -554,11 +547,12 @@ export default function CompanyEnrichmentPage() {
           }
 
           if (status === 'FAILED') {
-            throw new Error('Bulk enrichment process failed.');
+            throw new Error('Bulk enrichment process failed on the provider side.');
           }
 
           setTimeout(poll, 5000); // Continue polling
         } else {
+          // Handle cases where the top-level API call was not successful
           throw new Error(statusResult.error?.message || 'Invalid response from status check');
         }
       } catch (error: any) {
@@ -571,6 +565,7 @@ export default function CompanyEnrichmentPage() {
 
     poll();
   };
+
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 p-6">
@@ -660,7 +655,7 @@ export default function CompanyEnrichmentPage() {
             <CardHeader>
               <CardTitle>Bulk Enrichment</CardTitle>
               <CardDescription>
-                Upload a CSV file with company domains to enrich (max 10000 domains per batch)
+                Upload a CSV file with company domains to enrich (max 500 domains per batch)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -741,25 +736,48 @@ export default function CompanyEnrichmentPage() {
                 <div className="mt-6">
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="font-medium">Enrichment Results ({bulkResults.length} companies)</h4>
-                    <Button 
-                      onClick={() => {
-                        const dataStr = JSON.stringify(bulkResults, null, 2);
-                        const dataBlob = new Blob([dataStr], {type: 'application/json'});
-                        const url = URL.createObjectURL(dataBlob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `bulk_enrichment_results_${new Date().toISOString().split('T')[0]}.json`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                        toast.success('Bulk results exported');
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Export All Results
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button 
+                        onClick={() => {
+                          // This is the existing JSON export logic
+                          const dataStr = JSON.stringify(bulkResults, null, 2);
+                          const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                          const url = URL.createObjectURL(dataBlob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `bulk_enrichment_results_${new Date().toISOString().split('T')[0]}.json`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                          toast.success('JSON results exported');
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Export JSON
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          // New CSV Export Logic
+                          const csv = Papa.unparse(bulkResults);
+                          const dataBlob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+                          const url = URL.createObjectURL(dataBlob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `bulk_enrichment_results_${new Date().toISOString().split('T')[0]}.csv`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                          toast.success('CSV results exported');
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Export CSV
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="grid gap-4 max-h-96 overflow-y-auto">
@@ -803,7 +821,7 @@ export default function CompanyEnrichmentPage() {
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Required: Column containing company domains (e.g., google.com)</li>
                   <li>• Optional: Company names, additional information</li>
-                  <li>• Maximum: 10000 domains per batch</li>
+                  <li>• Maximum: 500 domains per batch</li>
                   <li>• File size limit: 5MB</li>
                 </ul>
               </div>

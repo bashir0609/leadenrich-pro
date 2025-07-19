@@ -114,12 +114,6 @@ export class ApolloProvider extends BaseProvider {
           `Operation ${request.operation} not implemented for Apollo`,
           501
         );
-      case ProviderOperation.CHECK_ENRICHMENT_STATUS:
-        throw new CustomError(
-          ErrorCode.OPERATION_FAILED,
-          `Operation ${request.operation} not implemented for Apollo`,
-          501
-        );
       default:
         throw new CustomError(
           ErrorCode.OPERATION_FAILED,
@@ -261,7 +255,6 @@ export class ApolloProvider extends BaseProvider {
       [ProviderOperation.SEARCH_PEOPLE]: 1,
       [ProviderOperation.SEARCH_COMPANIES]: 1,
       [ProviderOperation.FIND_LOOKALIKE]: 5,
-      [ProviderOperation.CHECK_ENRICHMENT_STATUS]: 0, // No cost for status check
     };
     return creditMap[operation] || 1;
   }

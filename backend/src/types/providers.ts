@@ -36,7 +36,6 @@ export enum ProviderOperation {
   SEARCH_PEOPLE = 'search-people',
   SEARCH_COMPANIES = 'search-companies',
   FIND_LOOKALIKE = 'find-lookalike',
-  CHECK_ENRICHMENT_STATUS = 'check-enrichment-status',
 }
 
 export interface ProviderConfig {

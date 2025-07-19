@@ -1,6 +1,3 @@
-# Using a modern version for better features
-version: '3.8'
-
 services:
   # --- APPLICATION SERVICES ---
   
@@ -9,9 +6,11 @@ services:
     build: ./backend
     container_name: leadenrich_backend
     restart: unless-stopped
+    env_file:
+    - ./backend/.env  # Add this line to load the backend .env file
     ports:
       # Exposes the backend's port 8000 to your machine's port 8000
-      - "8000:8000"
+      - "3001:3001"
     environment:
       # --- IMPORTANT: Use service names, not 'localhost' ---
       POSTGRES_HOST: postgres
@@ -22,12 +21,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: leadenrich_redis_2024
+      DATABASE_URL: postgresql://leadenrich:leadenrich_dev_2024@postgres:5432/leadenrich_db
     depends_on:
-      # This makes the backend wait until the databases are healthy before starting
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: ["./scripts/wait-for-it.sh", "postgres:5432", "--", "node", "dist/app.js"]
 
   frontend:
     # This tells Docker to build the image from the Dockerfile in your ./frontend directory

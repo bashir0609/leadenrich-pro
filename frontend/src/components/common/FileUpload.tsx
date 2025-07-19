@@ -13,6 +13,7 @@ interface FileUploadProps {
   maxSize?: number;
   uploading?: boolean;
   progress?: number;
+  disabled?: boolean;
 }
 
 export function FileUpload({

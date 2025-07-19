@@ -1,3 +1,4 @@
+// backend/src/services/providers/base/BaseProvider.ts
 import axios, { AxiosInstance } from 'axios';
 import Bottleneck from 'bottleneck';
 import pRetry from 'p-retry';
@@ -9,7 +10,7 @@ import {
   ProviderRequest,
   ProviderResponse,
   ProviderOperation,
-} from '@/types/providers';
+} from '../../../types/providers';
 
 export abstract class BaseProvider {
   protected config: ProviderConfig;
@@ -24,7 +25,7 @@ export abstract class BaseProvider {
     // Initialize HTTP client with enhanced configuration
     this.client = axios.create({
       baseURL: config.baseUrl,
-      timeout: config.customConfig?.timeout || 30000,
+      timeout: config.customConfig?.timeout || 60000,
       headers: {
         'User-Agent': 'LeadEnrich/1.0',
         'Accept': 'application/json',
@@ -57,7 +58,7 @@ export abstract class BaseProvider {
 
     try {
       // Validate operation is supported
-      if (!this.supportsOperation(request.operation)) {
+      if (request.operation !== ('check-enrichment-status' as ProviderOperation) && !this.supportsOperation(request.operation)) {
         throw new CustomError(
           ErrorCode.OPERATION_FAILED,
           `Provider ${this.config.name} does not support operation ${request.operation}`,
@@ -66,24 +67,31 @@ export abstract class BaseProvider {
       }
 
       // Execute with rate limiting and retry
-      const result = await this.rateLimiter.schedule(() =>
-        pRetry(
-          () => this.executeOperation(request),
-          {
-            retries: request.options?.retries || 3,
-            factor: 2,
-            minTimeout: 1000,
-            maxTimeout: 10000,
-            onFailedAttempt: (error) => {
-              logger.warn(`Provider ${this.config.name} attempt ${error.attemptNumber} failed:`, {
-                error: error.message,
-                operation: request.operation,
-                retriesLeft: error.retriesLeft,
-              });
-            },
-          }
-        )
-      );
+      let result;
+      if (request.operation === ('check-enrichment-status' as ProviderOperation)) {
+          // For status checks, call the operation directly without the p-retry wrapper
+          result = await this.executeOperation(request);
+      } else {
+          // For all other operations, use the rate limiter and retry logic
+          result = await this.rateLimiter.schedule(() =>
+            pRetry(
+              () => this.executeOperation.call(this, request),
+              {
+                retries: request.options?.retries || 3,
+                factor: 2,
+                minTimeout: 1000,
+                maxTimeout: 10000,
+                onFailedAttempt: (error) => {
+                  logger.warn(`Provider ${this.config.name} attempt ${error.attemptNumber} failed:`, {
+                    error: error.message,
+                    operation: request.operation,
+                    retriesLeft: error.retriesLeft,
+                  });
+                },
+              }
+            )
+          );
+      }
 
       const responseTime = Date.now() - startTime;
 
@@ -210,7 +218,6 @@ export abstract class BaseProvider {
       [ProviderOperation.SEARCH_PEOPLE]: 5,
       [ProviderOperation.SEARCH_COMPANIES]: 5,
       [ProviderOperation.FIND_LOOKALIKE]: 10,
-      [ProviderOperation.CHECK_ENRICHMENT_STATUS]: 0, // No cost for status check
     };
     return creditMap[operation] || 1;
   }
