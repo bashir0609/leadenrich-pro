@@ -48,5 +48,14 @@ USER nodejs
 EXPOSE 3001
 
 # Run database migrations and start the server
-# First, apply database migrations, then start the application
-CMD ["sh", "-c", "npx prisma migrate deploy && node -r tsconfig-paths/register dist/app.js"]
+# Copy entrypoint script
+COPY entrypoint.sh .
+
+# Make it executable
+RUN chmod +x ./entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Command to run
+CMD ["node", "-r", "tsconfig-paths/register", "dist/app.js"]
