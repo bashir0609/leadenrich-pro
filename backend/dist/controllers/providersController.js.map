@@ -1,1 +1,0 @@
-{"version":3,"file":"providersController.js","sourceRoot":"","sources":["../../src/controllers/providersController.ts"],"names":[],"mappings":";;;AAEA,6EAA0E;AAEnE,MAAM,YAAY,GAAG,CAAC,IAAa,EAAE,GAAa,EAAQ,EAAE;IACjE,MAAM,SAAS,GAAG,mCAAgB,CAAC,sBAAsB,EAAE,CAAC;IAC5D,GAAG,CAAC,MAAM,CAAC,GAAG,CAAC,CAAC,IAAI,CAAC,EAAE,SAAS,EAAE,CAAC,CAAC;AACtC,CAAC,CAAC;AAHW,QAAA,YAAY,gBAGvB"}
