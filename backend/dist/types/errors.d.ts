@@ -35,3 +35,4 @@ export declare const NotFoundError: (message: string, details?: ErrorDetails) =>
 export declare const UnauthorizedError: (message: string, details?: ErrorDetails) => CustomError;
 export declare const ForbiddenError: (message: string, details?: ErrorDetails) => CustomError;
 export declare const InternalServerError: (message: string, details?: ErrorDetails) => CustomError;
+//# sourceMappingURL=errors.d.ts.map

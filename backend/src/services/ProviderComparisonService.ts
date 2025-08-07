@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-import { ProviderOperation } from '@/types/providers';
-import { BaseProvider } from '@/services/providers/base/BaseProvider';
+import { ProviderOperation } from '../types/providers';
+import { BaseProvider } from '../services/providers/base/BaseProvider';
 import { ProviderFactory } from './providers/ProviderFactory';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 export interface ProviderMetrics {
   providerId: string;
@@ -50,7 +48,7 @@ export class ProviderComparisonService {
         lte: dateRange.end,
       };
     }
-
+    
     const usage = await prisma.apiUsage.findMany({ where });
     
     const totalRequests = usage.length;
@@ -130,20 +128,27 @@ export class ProviderComparisonService {
     /**
      * Get provider instances for all active providers or specified providers
      * @param providerIds Optional list of provider IDs to get instances for
+     * @param userId The ID of the user requesting the instances // <<< ADDED DOCS
      * @returns Array of BaseProvider instances
      */
-    static async getProviderInstances(providerIds?: string[]): Promise<BaseProvider[]> {
-    // Use a more explicit approach to define the query
-    const where: any = { isActive: true };
-    
-    // Only add the name filter if providerIds is provided
-    if (providerIds && providerIds.length > 0) {
-        where.name = { in: providerIds };
-    }
+    static async getProviderInstances(
+        providerIds: string[] | undefined, 
+        userId: string // <<< 1. ADD THE userId PARAMETER HERE
+    ): Promise<BaseProvider[]> {
+        // Use a more explicit approach to define the query
+        const where: any = { isActive: true };
+        
+        // Only add the name filter if providerIds is provided
+        if (providerIds && providerIds.length > 0) {
+            where.name = { in: providerIds };
+        }
     
     const providers = await prisma.provider.findMany({ where });
-    return Promise.all(providers.map(p => ProviderFactory.getProvider(p.name)));
+        
+        // <<< 2. PASS THE userId TO THE FACTORY CALL <<<
+        return Promise.all(providers.map(p => ProviderFactory.getProvider(p.name, userId)));
     }
+
   private static calculateProviderScore(metrics: any): number {
     return (
       metrics.successRate * 0.4 +

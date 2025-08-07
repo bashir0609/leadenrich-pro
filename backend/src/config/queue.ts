@@ -1,12 +1,9 @@
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 // Redis connection
-const connection = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
+const connection = new Redis(process.env.REDIS_URL || 'redis://leadenrich-redis:6379', {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });

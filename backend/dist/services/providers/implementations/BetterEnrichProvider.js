@@ -2,8 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BetterEnrichProvider = exports.BetterEnrichOperation = void 0;
 const BaseProvider_1 = require("../base/BaseProvider");
-const errors_1 = require("@/types/errors");
-const providers_1 = require("@/types/providers");
+const errors_1 = require("../../../types/errors");
+const ApiKeyService_1 = require("../../ApiKeyService");
+const providers_1 = require("../../../types/providers");
 // BetterEnrich specific types
 var BetterEnrichOperation;
 (function (BetterEnrichOperation) {
@@ -139,12 +140,28 @@ class BetterEnrichProvider extends BaseProvider_1.BaseProvider {
             this.features.set(feature.id, feature);
         });
     }
-    async authenticate() {
-        if (!this.config.apiKey) {
-            throw new errors_1.CustomError(errors_1.ErrorCode.AUTHENTICATION_ERROR, 'BetterEnrich API key not configured', 401);
+    async authenticate(userId) {
+        if (!userId) {
+            throw new Error('Authentication failed: BetterEnrichProvider was called without a user context.');
         }
-        const apiKey = this.decryptApiKey(this.config.apiKey);
-        this.client.defaults.headers.common['X-API-Key'] = apiKey;
+        try {
+            const apiKeyData = await ApiKeyService_1.ApiKeyService.getActiveApiKey(this.config.providerNumericId, userId);
+            if (!apiKeyData) {
+                throw new Error(`Authentication failed: No active API key found for BetterEnrich for user ID ${userId}.`);
+            }
+            const apiKey = apiKeyData.keyValue;
+            console.log('🔑 BetterEnrich API key configured');
+            // Clean the API key of any whitespace
+            const cleanApiKey = apiKey.trim();
+            this.client.defaults.headers.common['X-API-Key'] = cleanApiKey;
+            this.client.defaults.headers.common['Content-Type'] = 'application/json';
+            console.log('✅ Successfully authenticated with BetterEnrich API');
+        }
+        catch (error) {
+            console.error('❌ BetterEnrich authentication error:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+            throw new Error(`Authentication failed: ${errorMessage}`);
+        }
     }
     validateConfig() {
         if (!this.config.baseUrl) {
@@ -152,18 +169,45 @@ class BetterEnrichProvider extends BaseProvider_1.BaseProvider {
         }
     }
     mapErrorToStandard(error) {
-        if (error.response) {
-            const status = error.response.status;
+        if (error instanceof errors_1.CustomError) {
+            return error;
+        }
+        // Map BetterEnrich-specific error codes to standard error codes
+        if (error.response?.data?.error) {
+            const { status, message } = error.response.data.error;
             switch (status) {
                 case 401:
-                    return new errors_1.CustomError(errors_1.ErrorCode.AUTHENTICATION_ERROR, 'BetterEnrich authentication failed', 401);
+                case 403:
+                    return new errors_1.CustomError(errors_1.ErrorCode.AUTHENTICATION_ERROR, message || 'Authentication failed', status);
+                case 404:
+                    return new errors_1.CustomError(errors_1.ErrorCode.NOT_FOUND, message || 'Resource not found', status);
                 case 429:
-                    return new errors_1.CustomError(errors_1.ErrorCode.PROVIDER_RATE_LIMIT, 'BetterEnrich rate limit exceeded', 429);
+                    return new errors_1.CustomError(errors_1.ErrorCode.RATE_LIMIT_EXCEEDED, message || 'Rate limit exceeded', status);
+                case 500:
+                    return new errors_1.CustomError(errors_1.ErrorCode.INTERNAL_SERVER_ERROR, message || 'Internal server error', status);
                 default:
-                    return new errors_1.CustomError(errors_1.ErrorCode.PROVIDER_ERROR, 'BetterEnrich API error', status);
+                    return new errors_1.CustomError(errors_1.ErrorCode.PROVIDER_ERROR, message || 'API error occurred', status || 500);
             }
         }
-        return new errors_1.CustomError(errors_1.ErrorCode.PROVIDER_ERROR, 'BetterEnrich provider error', 500);
+        if (error.response) {
+            const status = error.response.status;
+            const message = error.response.data?.message || error.response.statusText || 'API error';
+            switch (status) {
+                case 401:
+                case 403:
+                    return new errors_1.CustomError(errors_1.ErrorCode.AUTHENTICATION_ERROR, message, status);
+                case 404:
+                    return new errors_1.CustomError(errors_1.ErrorCode.NOT_FOUND, message, status);
+                case 429:
+                    return new errors_1.CustomError(errors_1.ErrorCode.RATE_LIMIT_EXCEEDED, message, status);
+                case 500:
+                    return new errors_1.CustomError(errors_1.ErrorCode.INTERNAL_SERVER_ERROR, message, status);
+                default:
+                    return new errors_1.CustomError(errors_1.ErrorCode.PROVIDER_ERROR, message, status);
+            }
+        }
+        // For network errors or other unhandled cases
+        return new errors_1.CustomError(errors_1.ErrorCode.INTERNAL_SERVER_ERROR, error.message || 'An unknown error occurred', error.statusCode || 500);
     }
     async executeOperation(request) {
         // Handle standard operations
@@ -180,44 +224,120 @@ class BetterEnrichProvider extends BaseProvider_1.BaseProvider {
     async handleStandardOperation(request) {
         switch (request.operation) {
             case providers_1.ProviderOperation.FIND_EMAIL:
+                // Map to work email finder
                 return this.executeFeature(this.features.get(BetterEnrichOperation.FIND_WORK_EMAIL), request.params);
             case providers_1.ProviderOperation.ENRICH_PERSON:
+                // Map to single enrichment (can be enhanced to use waterfall if needed)
                 return this.executeFeature(this.features.get(BetterEnrichOperation.SINGLE_ENRICHMENT), request.params);
+            case providers_1.ProviderOperation.ENRICH_COMPANY:
+                // Map to company normalization (BetterEnrich doesn't have full company enrichment)
+                return this.executeFeature(this.features.get(BetterEnrichOperation.NORMALIZE_COMPANY), request.params);
+            // Note: BetterEnrich doesn't support SEARCH_PEOPLE or SEARCH_COMPANIES
+            // These operations are not available in BetterEnrich's feature set
             default:
-                throw new errors_1.CustomError(errors_1.ErrorCode.OPERATION_FAILED, `Standard operation ${request.operation} not mapped for BetterEnrich`, 501);
+                // List supported operations for better error messaging
+                const supportedOps = [
+                    providers_1.ProviderOperation.FIND_EMAIL,
+                    providers_1.ProviderOperation.ENRICH_PERSON,
+                    providers_1.ProviderOperation.ENRICH_COMPANY
+                ];
+                throw new errors_1.CustomError(errors_1.ErrorCode.OPERATION_FAILED, `Standard operation '${request.operation}' not supported by BetterEnrich. Supported operations: ${supportedOps.join(', ')}. Use BetterEnrich-specific operations for advanced features.`, 501);
         }
     }
     async executeFeature(feature, params) {
-        const response = await this.client.request({
-            method: feature.method,
-            url: feature.endpoint,
-            data: params,
-        });
-        return this.transformResponse(feature.id, response.data);
+        console.log(`🔍 BetterEnrich ${feature.name} Request:`, JSON.stringify(params, null, 2));
+        // Add a 1-second delay before making the request to prevent overwhelming the API
+        console.log(`⏳ Adding 1-second delay before BetterEnrich ${feature.id} request`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+            const response = await this.client.request({
+                method: feature.method,
+                url: feature.endpoint,
+                data: params,
+                timeout: 30000, // 30 second timeout
+            });
+            console.log(`✅ BetterEnrich ${feature.name} Response:`, JSON.stringify(response.data, null, 2));
+            return this.transformResponse(feature.id, response.data);
+        }
+        catch (error) {
+            console.error(`❌ BetterEnrich ${feature.name} failed:`, error);
+            throw this.mapErrorToStandard(error);
+        }
     }
     transformResponse(featureId, data) {
+        if (!data) {
+            throw new errors_1.CustomError(errors_1.ErrorCode.NOT_FOUND, 'No data returned from BetterEnrich API', 404);
+        }
         // Transform BetterEnrich responses to standard format
         switch (featureId) {
             case BetterEnrichOperation.FIND_WORK_EMAIL:
                 return {
-                    email: data.email,
-                    confidence: data.confidence || 0.9,
+                    email: data.email || null,
+                    confidence: typeof data.confidence === 'number' ? data.confidence : 0.9,
                     sources: ['betterenrich'],
-                    verified: data.verified || false,
+                    verified: Boolean(data.verified),
+                    _metadata: {
+                        timestamp: new Date().toISOString(),
+                        source: 'betterenrich',
+                        feature: featureId
+                    }
                 };
             case BetterEnrichOperation.SINGLE_ENRICHMENT:
                 return {
-                    firstName: data.first_name,
-                    lastName: data.last_name,
-                    email: data.email,
-                    phone: data.phone,
-                    title: data.job_title,
-                    company: data.company_name,
-                    linkedinUrl: data.linkedin_url,
-                    additionalData: data,
+                    firstName: data.first_name || null,
+                    lastName: data.last_name || null,
+                    fullName: data.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim() || null,
+                    email: data.email || null,
+                    phone: data.phone || null,
+                    title: data.job_title || data.title || null,
+                    company: data.company_name || data.company || null,
+                    linkedinUrl: data.linkedin_url || null,
+                    location: data.location || null,
+                    additionalData: {
+                        seniority: data.seniority,
+                        department: data.department,
+                        industry: data.industry,
+                        ...data
+                    },
+                    _metadata: {
+                        timestamp: new Date().toISOString(),
+                        source: 'betterenrich',
+                        feature: featureId
+                    }
+                };
+            case BetterEnrichOperation.WATERFALL_ENRICHMENT:
+                return {
+                    firstName: data.first_name || null,
+                    lastName: data.last_name || null,
+                    fullName: data.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim() || null,
+                    email: data.email || null,
+                    phone: data.phone || null,
+                    title: data.job_title || data.title || null,
+                    company: data.company_name || data.company || null,
+                    linkedinUrl: data.linkedin_url || null,
+                    location: data.location || null,
+                    additionalData: {
+                        enrichmentSources: data.sources || [],
+                        confidence: data.confidence || 0.8,
+                        ...data
+                    },
+                    _metadata: {
+                        timestamp: new Date().toISOString(),
+                        source: 'betterenrich',
+                        feature: featureId,
+                        enrichmentType: 'waterfall'
+                    }
                 };
             default:
-                return data;
+                // For other features, return the data with metadata
+                return {
+                    ...data,
+                    _metadata: {
+                        timestamp: new Date().toISOString(),
+                        source: 'betterenrich',
+                        feature: featureId
+                    }
+                };
         }
     }
     // Public method to get all available features
@@ -229,6 +349,20 @@ class BetterEnrichProvider extends BaseProvider_1.BaseProvider {
         return Array.from(this.features.values()).filter((f) => f.category === category);
     }
     calculateCredits(operation) {
+        // Handle standard operations
+        if (Object.values(providers_1.ProviderOperation).includes(operation)) {
+            switch (operation) {
+                case providers_1.ProviderOperation.FIND_EMAIL:
+                    return this.features.get(BetterEnrichOperation.FIND_WORK_EMAIL)?.credits || 1;
+                case providers_1.ProviderOperation.ENRICH_PERSON:
+                    return this.features.get(BetterEnrichOperation.SINGLE_ENRICHMENT)?.credits || 1;
+                case providers_1.ProviderOperation.ENRICH_COMPANY:
+                    return this.features.get(BetterEnrichOperation.NORMALIZE_COMPANY)?.credits || 0.1;
+                default:
+                    return 1; // Default credit cost
+            }
+        }
+        // Handle BetterEnrich specific operations
         const feature = this.features.get(operation);
         return feature?.credits || 1;
     }

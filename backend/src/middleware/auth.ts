@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthService } from '@/services/AuthService';
-import { CustomError, ErrorCode } from '@/types/errors';
+import { AuthService } from '../services/AuthService';
+import { CustomError, ErrorCode } from '../types/errors';
 
 // FIX: Update the interface to use the detailed user object structure.
 export interface AuthRequest extends Request {

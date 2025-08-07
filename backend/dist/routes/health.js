@@ -1,12 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.healthRouter = void 0;
 const express_1 = require("express");
-const client_1 = require("@prisma/client");
+const prisma_1 = __importDefault(require("../lib/prisma"));
 const logger_1 = require("../utils/logger");
 const router = (0, express_1.Router)();
 exports.healthRouter = router;
-const prisma = new client_1.PrismaClient();
 // Basic health check
 router.get('/', (req, res) => {
     res.json({
@@ -49,7 +51,7 @@ router.get('/detailed', async (req, res) => {
 async function checkDatabase() {
     const startTime = Date.now();
     try {
-        await prisma.$queryRaw `SELECT 1`;
+        await prisma_1.default.$queryRaw `SELECT 1`;
         return {
             status: 'up',
             responseTime: Date.now() - startTime,

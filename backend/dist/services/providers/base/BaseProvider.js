@@ -4,13 +4,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseProvider = void 0;
+// backend/src/services/providers/base/BaseProvider.ts
 const axios_1 = __importDefault(require("axios"));
 const bottleneck_1 = __importDefault(require("bottleneck"));
 const p_retry_1 = __importDefault(require("p-retry"));
 const crypto_js_1 = __importDefault(require("crypto-js"));
-const logger_1 = require("@/utils/logger");
-const errors_1 = require("@/types/errors");
-const providers_1 = require("@/types/providers");
+const logger_1 = require("../../../utils/logger");
+const errors_1 = require("../../../types/errors");
+const providers_1 = require("../../../types/providers");
 class BaseProvider {
     constructor(config) {
         this.config = config;
@@ -18,7 +19,7 @@ class BaseProvider {
         // Initialize HTTP client with enhanced configuration
         this.client = axios_1.default.create({
             baseURL: config.baseUrl,
-            timeout: config.customConfig?.timeout || 30000,
+            timeout: config.customConfig?.timeout || 60000,
             headers: {
                 'User-Agent': 'LeadEnrich/1.0',
                 'Accept': 'application/json',
@@ -40,25 +41,37 @@ class BaseProvider {
     async execute(request) {
         const startTime = Date.now();
         const requestId = this.generateRequestId();
+        console.log(`🔎 BaseProvider.execute called for ${this.config.name} with operation: ${request.operation}`);
+        console.log(`🔎 Supported operations for ${this.config.name}:`, this.config.supportedOperations);
         try {
             // Validate operation is supported
-            if (!this.supportsOperation(request.operation)) {
+            const isSupported = this.supportsOperation(request.operation);
+            console.log(`🔎 Operation ${request.operation} supported by ${this.config.name}: ${isSupported}`);
+            if (request.operation !== 'check-enrichment-status' && !isSupported) {
                 throw new errors_1.CustomError(errors_1.ErrorCode.OPERATION_FAILED, `Provider ${this.config.name} does not support operation ${request.operation}`, 400);
             }
             // Execute with rate limiting and retry
-            const result = await this.rateLimiter.schedule(() => (0, p_retry_1.default)(() => this.executeOperation.call(this, request), {
-                retries: request.options?.retries || 3,
-                factor: 2,
-                minTimeout: 1000,
-                maxTimeout: 10000,
-                onFailedAttempt: (error) => {
-                    logger_1.logger.warn(`Provider ${this.config.name} attempt ${error.attemptNumber} failed:`, {
-                        error: error.message,
-                        operation: request.operation,
-                        retriesLeft: error.retriesLeft,
-                    });
-                },
-            }));
+            let result;
+            if (request.operation === 'check-enrichment-status') {
+                // For status checks, call the operation directly without the p-retry wrapper
+                result = await this.executeOperation(request);
+            }
+            else {
+                // For all other operations, use the rate limiter and retry logic
+                result = await this.rateLimiter.schedule(() => (0, p_retry_1.default)(() => this.executeOperation.call(this, request), {
+                    retries: request.options?.retries || 0,
+                    factor: 2,
+                    minTimeout: 1000,
+                    maxTimeout: 10000,
+                    onFailedAttempt: (error) => {
+                        logger_1.logger.warn(`Provider ${this.config.name} attempt ${error.attemptNumber} failed:`, {
+                            error: error.message,
+                            operation: request.operation,
+                            retriesLeft: error.retriesLeft,
+                        });
+                    },
+                }));
+            }
             const responseTime = Date.now() - startTime;
             return {
                 success: true,
@@ -159,7 +172,6 @@ class BaseProvider {
             [providers_1.ProviderOperation.SEARCH_PEOPLE]: 5,
             [providers_1.ProviderOperation.SEARCH_COMPANIES]: 5,
             [providers_1.ProviderOperation.FIND_LOOKALIKE]: 10,
-            [providers_1.ProviderOperation.CHECK_ENRICHMENT_STATUS]: 0, // No cost for status check
         };
         return creditMap[operation] || 1;
     }
@@ -230,9 +242,10 @@ class BaseProvider {
         return true;
     }
     // Health check method
-    async healthCheck() {
+    // <<< FIX: The healthCheck also needs to pass the userId if it's going to work correctly <<<
+    async healthCheck(userId) {
         try {
-            await this.authenticate();
+            await this.authenticate(userId); // Pass userId here
             return { healthy: true };
         }
         catch (error) {

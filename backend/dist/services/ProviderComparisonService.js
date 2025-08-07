@@ -1,9 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProviderComparisonService = void 0;
-const client_1 = require("@prisma/client");
 const ProviderFactory_1 = require("./providers/ProviderFactory");
-const prisma = new client_1.PrismaClient();
+const prisma_1 = __importDefault(require("../lib/prisma"));
 class ProviderComparisonService {
     static async getProviderMetrics(providerId, dateRange) {
         const where = {
@@ -15,7 +17,7 @@ class ProviderComparisonService {
                 lte: dateRange.end,
             };
         }
-        const usage = await prisma.apiUsage.findMany({ where });
+        const usage = await prisma_1.default.apiUsage.findMany({ where });
         const totalRequests = usage.length;
         const successfulRequests = usage.filter((u) => u.statusCode === 200).length;
         const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0;
@@ -28,7 +30,7 @@ class ProviderComparisonService {
             const reason = `${u.statusCode} - ${u.endpoint}`;
             failureReasons[reason] = (failureReasons[reason] || 0) + 1;
         });
-        const provider = await prisma.provider.findUnique({
+        const provider = await prisma_1.default.provider.findUnique({
             where: { id: parseInt(providerId) },
         });
         return {
@@ -44,10 +46,10 @@ class ProviderComparisonService {
     }
     static async compareProviders(operation, providerIds) {
         const providers = providerIds
-            ? await prisma.provider.findMany({
+            ? await prisma_1.default.provider.findMany({
                 where: { name: { in: providerIds }, isActive: true },
             })
-            : await prisma.provider.findMany({ where: { isActive: true } });
+            : await prisma_1.default.provider.findMany({ where: { isActive: true } });
         const comparisons = [];
         for (const provider of providers) {
             const metrics = await this.getProviderMetrics(provider.name);
@@ -79,17 +81,20 @@ class ProviderComparisonService {
     /**
      * Get provider instances for all active providers or specified providers
      * @param providerIds Optional list of provider IDs to get instances for
+     * @param userId The ID of the user requesting the instances // <<< ADDED DOCS
      * @returns Array of BaseProvider instances
      */
-    static async getProviderInstances(providerIds) {
+    static async getProviderInstances(providerIds, userId // <<< 1. ADD THE userId PARAMETER HERE
+    ) {
         // Use a more explicit approach to define the query
         const where = { isActive: true };
         // Only add the name filter if providerIds is provided
         if (providerIds && providerIds.length > 0) {
             where.name = { in: providerIds };
         }
-        const providers = await prisma.provider.findMany({ where });
-        return Promise.all(providers.map(p => ProviderFactory_1.ProviderFactory.getProvider(p.name)));
+        const providers = await prisma_1.default.provider.findMany({ where });
+        // <<< 2. PASS THE userId TO THE FACTORY CALL <<<
+        return Promise.all(providers.map(p => ProviderFactory_1.ProviderFactory.getProvider(p.name, userId)));
     }
     static calculateProviderScore(metrics) {
         return (metrics.successRate * 0.4 +

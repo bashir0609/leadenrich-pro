@@ -2,9 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadRouter = void 0;
 const express_1 = require("express");
-const upload_1 = require("@/middleware/upload");
-const FileProcessingService_1 = require("@/services/FileProcessingService");
-const logger_1 = require("@/utils/logger");
+const upload_1 = require("../middleware/upload");
+const FileProcessingService_1 = require("../services/FileProcessingService");
+const logger_1 = require("../utils/logger");
 const router = (0, express_1.Router)();
 exports.uploadRouter = router;
 // Upload and parse CSV

@@ -1,14 +1,14 @@
 import { AxiosInstance } from 'axios';
 import Bottleneck from 'bottleneck';
-import { CustomError } from '@/types/errors';
-import { ProviderConfig, ProviderRequest, ProviderResponse, ProviderOperation } from '@/types/providers';
+import { CustomError } from '../../../types/errors';
+import { ProviderConfig, ProviderRequest, ProviderResponse, ProviderOperation } from '../../../types/providers';
 export declare abstract class BaseProvider {
     protected config: ProviderConfig;
     protected client: AxiosInstance;
     protected rateLimiter: Bottleneck;
     private encryptionKey;
     constructor(config: ProviderConfig);
-    abstract authenticate(): Promise<void>;
+    abstract authenticate(userId?: string): Promise<void>;
     abstract validateConfig(): void;
     abstract mapErrorToStandard(error: any): CustomError;
     execute<T>(request: ProviderRequest): Promise<ProviderResponse<T>>;
@@ -28,7 +28,7 @@ export declare abstract class BaseProvider {
     get id(): string;
     get category(): string;
     get isHealthy(): boolean;
-    healthCheck(): Promise<{
+    healthCheck(userId?: string): Promise<{
         healthy: boolean;
         message?: string;
     }>;
@@ -38,3 +38,4 @@ export declare abstract class BaseProvider {
         features: string[];
     };
 }
+//# sourceMappingURL=BaseProvider.d.ts.map

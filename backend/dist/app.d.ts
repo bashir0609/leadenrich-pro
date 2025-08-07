@@ -7,3 +7,4 @@ declare global {
     var io: import('socket.io').Server;
 }
 export default app;
+//# sourceMappingURL=app.d.ts.map

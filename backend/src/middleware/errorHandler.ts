@@ -6,11 +6,13 @@ export const errorHandler = (
   err: Error | CustomError,
   req: Request,
   res: Response,
-  _next: NextFunction // Renamed to _next to indicate it's not used
+  _next: NextFunction
 ): void => {
-  // Log error
-  logger.error({
-    error: err.message,
+  // <<< THE CRITICAL FIX IS HERE <<<
+  // The first argument to logger.error should be the main message string.
+  // The second argument is the metadata object.
+  logger.error(err.message, {
+    // We move err.message out of the object and make it the primary log message.
     stack: err.stack,
     url: req.url,
     method: req.method,
@@ -18,7 +20,7 @@ export const errorHandler = (
     ...(err instanceof CustomError && { code: err.code, details: err.details }),
   });
 
-  // Handle known errors
+  // Handle known errors (This part is correct and remains the same)
   if (err instanceof CustomError) {
     res.status(err.statusCode).json({
       success: false,
@@ -31,7 +33,7 @@ export const errorHandler = (
     return;
   }
 
-  // Handle unknown errors
+  // Handle unknown errors (This part is correct and remains the same)
   res.status(500).json({
     success: false,
     error: {

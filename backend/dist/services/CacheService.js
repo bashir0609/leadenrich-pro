@@ -5,7 +5,33 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CacheService = void 0;
 const ioredis_1 = __importDefault(require("ioredis"));
-const logger_1 = require("@/utils/logger");
+const logger_1 = require("../utils/logger");
+// Mock Redis client for local development to avoid connection errors.
+const mockRedis = {
+    get: async (key) => {
+        logger_1.logger.info(`[Mock Redis] GET ${key}`);
+        // Simulate a cache miss in development to always fetch fresh data.
+        return null;
+    },
+    setex: async (key, ttl, value) => {
+        logger_1.logger.info(`[Mock Redis] SETEX ${key} with TTL ${ttl}: ${value}`);
+        return 'OK';
+    },
+    del: async (key) => {
+        logger_1.logger.info(`[Mock Redis] DEL ${key}`);
+        return 1;
+    },
+    flushdb: async () => {
+        logger_1.logger.info('[Mock Redis] FLUSHDB');
+        return 'OK';
+    },
+};
+// Use the mock client in development, otherwise connect to the real Redis server.
+const isDevelopment = process.env.NODE_ENV === 'development';
+const redisClient = isDevelopment
+    ? mockRedis
+    : new ioredis_1.default(process.env.REDIS_URL || 'redis://localhost:6379');
+logger_1.logger.info(isDevelopment ? '🔧 Using Mock Redis for local development.' : '🚀 Connecting to Redis...');
 class CacheService {
     static async get(key) {
         try {
@@ -46,6 +72,7 @@ class CacheService {
     }
     // Provider response caching
     static getCacheKey(provider, operation, params) {
+        // Sort keys for a consistent hash, regardless of parameter order.
         const paramString = JSON.stringify(params, Object.keys(params).sort());
         const hash = Buffer.from(paramString).toString('base64');
         return `provider:${provider}:${operation}:${hash}`;
@@ -60,6 +87,7 @@ class CacheService {
     }
 }
 exports.CacheService = CacheService;
-CacheService.redis = new ioredis_1.default(process.env.REDIS_URL || 'redis://localhost:6379');
+// The client is now dynamically chosen based on the environment.
+CacheService.redis = redisClient;
 CacheService.DEFAULT_TTL = 3600; // 1 hour
 //# sourceMappingURL=CacheService.js.map

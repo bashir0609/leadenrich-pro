@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft } from 'lucide-react';
-import { useProviderStore } from '@/lib/stores/providerStore';
 import { useProviders } from '@/lib/api/providers';
+import { useProviderStore } from '@/lib/stores/providerStore';
+import { Provider } from '@/types';
 
 export default function ProviderPage() {
   // Navigation and routing
@@ -17,7 +18,12 @@ export default function ProviderPage() {
   const providerName = params.name as string;
   
   const { selectedProvider, setSelectedProvider } = useProviderStore();
-  const { data: providers, isLoading, error } = useProviders();
+  
+  const { data: providers, isLoading, error } = useProviders() as { 
+    data: Provider[] | undefined, 
+    isLoading: boolean, 
+    error: Error | null 
+  };
   
   // Track whether we've attempted to set the provider
   const [providerSet, setProviderSet] = useState(false);

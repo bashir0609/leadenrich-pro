@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
 import csv from 'csv-parser';
 import { createReadStream } from 'fs';
-import { logger } from '@/utils/logger';
-import { CustomError, ErrorCode } from '@/types/errors';
+import { logger } from '../utils/logger';
+import { CustomError, ErrorCode } from '../types/errors';
 
 export interface ParsedData {
   headers: string[];

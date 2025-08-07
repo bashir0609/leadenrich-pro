@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+// backend/prisma/seed.ts
 import crypto from 'crypto-js';
 import * as process from 'process';
-
-
-const prisma = new PrismaClient();
+import prisma from '../src/lib/prisma';
+// const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Seeding LeadEnrich Pro database...');
@@ -29,7 +28,7 @@ async function main() {
     update: {},
     create: {
       key: 'api_version',
-      value: { version: '1.0.0', build: Date.now() },
+      value: JSON.stringify({ version: '1.0.0', build: Date.now() }),
     },
   });
 
@@ -38,11 +37,11 @@ async function main() {
     update: {},
     create: {
       key: 'default_rate_limits',
-      value: {
+      value: JSON.stringify({
         requestsPerSecond: 10,
         burstSize: 20,
         dailyQuota: 2000,
-      },
+      }),
     },
   });
 
@@ -52,69 +51,74 @@ async function main() {
     where: { name: 'surfe' },
     update: {
       baseUrl: 'https://api.surfe.com',
-      configuration: {
-        version: 'v2',
-        features: ['people', 'companies', 'enrichment', 'lookalike'],
-        timeout: 30000,
-        retryAttempts: 3,
-        asyncEnrichment: true, // Key addition - Surfe uses async enrichment
-        supportedOperations: [
-          'find-email',
-          'enrich-person',
-          'enrich-company',
-          'search-people',
-          'search-companies',
-          'find-lookalike'
-        ]
-      },
-    },
-    create: {
-      name: 'surfe',
-      displayName: 'Surfe',
-      category: 'major-database',
-      baseUrl: 'https://api.surfe.com',
-      apiKeyEncrypted: process.env.SURFE_API_KEY 
-        ? crypto.AES.encrypt(process.env.SURFE_API_KEY, encryptionKey).toString()
-        : null,
-      rateLimit: 10,
-      dailyQuota: 2000,
-      isActive: true,
-      configuration: {
+      configuration: JSON.stringify({
         version: 'v2',
         features: ['people', 'companies', 'enrichment', 'lookalike'],
         timeout: 30000,
         retryAttempts: 3,
         asyncEnrichment: true,
         supportedOperations: [
-          'find-email',
-          'enrich-person',
-          'enrich-company',
-          'search-people',
-          'search-companies',
-          'find-lookalike'
+          'find-email', 'enrich-person', 'enrich-company',
+          'search-people', 'search-companies', 'find-lookalike'
         ]
-      },
+      }),
+    },
+    create: {
+      name: 'surfe',
+      displayName: 'Surfe',
+      category: 'major-database',
+      baseUrl: 'https://api.surfe.com',
+      rateLimit: 10,
+      dailyQuota: 2000,
+      isActive: true,
+      configuration: JSON.stringify({
+        version: 'v2',
+        features: ['people', 'companies', 'enrichment', 'lookalike'],
+        timeout: 30000,
+        retryAttempts: 3,
+        asyncEnrichment: true,
+        supportedOperations: [
+          'find-email', 'enrich-person', 'enrich-company',
+          'search-people', 'search-companies', 'find-lookalike'
+        ]
+      }),
     },
   });
 
+  // Create Apollo provider
   const apollo = await prisma.provider.upsert({
     where: { name: 'apollo' },
-    update: {},
+    update: {
+      baseUrl: 'https://api.apollo.io',
+      configuration: JSON.stringify({
+        version: 'v1',
+        features: ['people', 'companies', 'enrichment'],
+        timeout: 30000,
+        retryAttempts: 3,
+        strengths: ['US data', 'Technology companies', 'Sales intelligence'],
+        supportedOperations: [
+          'search-people', 'search-companies', 'enrich-person', 'enrich-company'
+        ]
+      }),
+    },
     create: {
       name: 'apollo',
       displayName: 'Apollo.io',
       category: 'major-database',
-      baseUrl: 'https://api.apollo.io/v1',
-      apiKeyEncrypted: process.env.APOLLO_API_KEY 
-        ? crypto.AES.encrypt(process.env.APOLLO_API_KEY, encryptionKey).toString()
-        : null,
+      baseUrl: 'https://api.apollo.io',
       rateLimit: 50,
       dailyQuota: 10000,
       isActive: true,
-      configuration: {
-        database_size: '275M contacts',
+      configuration: JSON.stringify({
+        version: 'v1',
+        features: ['people', 'companies', 'enrichment'],
+        timeout: 30000,
+        retryAttempts: 3,
         strengths: ['US data', 'Technology companies', 'Sales intelligence'],
-      },
+        supportedOperations: [
+          'search-people', 'search-companies', 'enrich-person', 'enrich-company'
+        ]
+      }),
     },
   });
 
@@ -127,16 +131,13 @@ async function main() {
       displayName: 'BetterEnrich',
       category: 'email-finder',
       baseUrl: 'https://api.betterenrich.com/v1',
-      apiKeyEncrypted: process.env.BETTERENRICH_API_KEY 
-        ? crypto.AES.encrypt(process.env.BETTERENRICH_API_KEY, encryptionKey).toString()
-        : null,
       rateLimit: 30,
       dailyQuota: 5000,
       isActive: true,
-      configuration: {
+      configuration: JSON.stringify({
         features_count: 20,
         categories: ['enrichment', 'email-finder', 'phone-finder', 'ad-intelligence', 'social-enrichment'],
-      },
+      }),
     },
   });
   
@@ -218,10 +219,103 @@ async function main() {
           featureId: feature.featureId,
         },
       },
-      update: {},
+      update: {
+        parameters: JSON.stringify(feature.parameters)
+      },
       create: {
-        ...feature,
         providerId: surfe.id,
+        featureId: feature.featureId,
+        featureName: feature.featureName,
+        category: feature.category,
+        endpoint: feature.endpoint,
+        httpMethod: feature.httpMethod,
+        creditsPerRequest: feature.creditsPerRequest,
+        description: feature.description,
+        // <<< FIX: Convert object to JSON string
+        parameters: JSON.stringify(feature.parameters),
+        isActive: true,
+      },
+    });
+  }
+
+  // Seed Apollo features
+  console.log('✨ Creating Apollo features...');
+  const apolloFeatures = [
+    {
+      featureId: 'people-search',
+      featureName: 'People Search',
+      category: 'search',
+      endpoint: '/api/v1/mixed_people/search',
+      httpMethod: 'POST',
+      creditsPerRequest: 1,
+      description: 'Search for people based on company, title, and other criteria',
+      parameters: {
+        required: [],
+        optional: ['person_titles', 'person_seniorities', 'person_departments', 'organization_domains', 'organization_names', 'organization_industries', 'limit', 'page'],
+      },
+    },
+    {
+      featureId: 'company-search',
+      featureName: 'Company Search',
+      category: 'search',
+      endpoint: '/api/v1/mixed_companies/search',
+      httpMethod: 'POST',
+      creditsPerRequest: 1,
+      description: 'Search for companies by industry, size, and location',
+      parameters: {
+        required: [],
+        optional: ['organization_domains', 'organization_industries', 'organization_num_employees_ranges', 'limit', 'page'],
+      },
+    },
+    {
+      featureId: 'people-enrich',
+      featureName: 'People Enrichment',
+      category: 'enrichment',
+      endpoint: '/api/v1/people/enrich',
+      httpMethod: 'POST',
+      creditsPerRequest: 2,
+      description: 'Enrich person data with email, phone, LinkedIn',
+      parameters: {
+        required: ['first_name', 'last_name'],
+        optional: ['email', 'organization_name', 'domain'],
+      },
+    },
+    {
+      featureId: 'company-enrich',
+      featureName: 'Company Enrichment',
+      category: 'enrichment',
+      endpoint: '/api/v1/organizations/enrich',
+      httpMethod: 'POST',
+      creditsPerRequest: 3,
+      description: 'Enrich company data with firmographics, funding',
+      parameters: {
+        required: [],
+        optional: ['organization_name', 'domain'],
+      },
+    },
+  ];
+
+  for (const feature of apolloFeatures) {
+    await prisma.providerFeature.upsert({
+      where: {
+        providerId_featureId: {
+          providerId: apollo.id,
+          featureId: feature.featureId,
+        },
+      },
+      update: {
+        parameters: JSON.stringify(feature.parameters)
+      },
+      create: {
+        providerId: apollo.id,
+        featureId: feature.featureId,
+        featureName: feature.featureName,
+        category: feature.category,
+        endpoint: feature.endpoint,
+        httpMethod: feature.httpMethod,
+        creditsPerRequest: feature.creditsPerRequest,
+        description: feature.description,
+        parameters: JSON.stringify(feature.parameters),
         isActive: true,
       },
     });
@@ -231,14 +325,6 @@ async function main() {
   console.log('🧪 Creating mock providers...');
   
   const mockProviders = [
-    {
-      name: 'apollo',
-      displayName: 'Apollo',
-      category: 'major-database',
-      baseUrl: 'https://api.apollo.io',
-      rateLimit: 15,
-      dailyQuota: 5000,
-    },
     {
       name: 'zoominfo',
       displayName: 'ZoomInfo',
@@ -262,12 +348,18 @@ async function main() {
       where: { name: provider.name },
       update: {},
       create: {
-        ...provider,
+        name: provider.name,
+        displayName: provider.displayName,
+        category: provider.category,
+        baseUrl: provider.baseUrl,
+        rateLimit: provider.rateLimit,
+        dailyQuota: provider.dailyQuota,
         isActive: false, // Keep inactive for now
-        configuration: {
+        // <<< FIX: Convert object to JSON string
+        configuration: JSON.stringify({
           version: 'v1',
           placeholder: true,
-        },
+        }),
       },
     });
   }
@@ -283,6 +375,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
     console.log('🔌 Database connection closed');
   });

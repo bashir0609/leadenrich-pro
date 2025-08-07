@@ -1,19 +1,19 @@
 // backend/src/routes/providers.ts
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { validate } from '@/utils/validation';
-import { ProviderOperation } from '@/types/providers';
-import { ProviderFactory } from '@/services/providers/ProviderFactory';
-import { QueueService } from '@/services/QueueService';
-import { PrismaClient } from '@prisma/client';
-import { logger } from '@/utils/logger';
-import { CustomRequest } from '@/types/express';
-import { BadRequestError, NotFoundError } from '@/types/errors';
+import { validate } from '../utils/validation';
+import { ProviderOperation } from '../types/providers';
+import { ProviderFactory } from '../services/providers/ProviderFactory';
+import { QueueService } from '../services/QueueService';
+import prisma from '../lib/prisma';
+import { logger } from '../utils/logger';
+import { CustomRequest } from '../types/express'; // This might be used implicitly
+import { BadRequestError, NotFoundError } from '../types/errors';
+import { authenticate, AuthRequest } from '../middleware/auth'; // <<< 1. IMPORT AuthRequest TYPE
 
 const router = Router();
-const prisma = new PrismaClient();
 
-// Get all active providers
+// Get all active providers (This can remain public)
 router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const providers = await prisma.provider.findMany({
@@ -23,20 +23,36 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
         name: true,
         displayName: true,
         category: true,
-        features: {
-          select: {
-            featureId: true,
-            featureName: true,
-            category: true,
-            creditsPerRequest: true,
-          },
-        },
+        configuration: true,
       },
+    });
+
+    // Transform providers to include features from configuration
+    const transformedProviders = providers.map(provider => {
+      let features = [];
+      try {
+        const config = JSON.parse(provider.configuration || '{}');
+        if (config.supportedOperations) {
+          features = config.supportedOperations.map((op: string, index: number) => ({
+            featureId: `${provider.name}_${index}`,
+            featureName: op,
+            category: provider.category,
+            creditsPerRequest: 1
+          }));
+        }
+      } catch (error) {
+        logger.error('Error parsing provider configuration:', error);
+      }
+      
+      return {
+        ...provider,
+        features
+      };
     });
 
     res.json({
       success: true,
-      data: providers,
+      data: transformedProviders,
     });
   } catch (error) {
     next(error);
@@ -44,9 +60,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 });
 
 // Test provider connection
-router.post('/:providerId/test', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+router.post('/:providerId/test', authenticate, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { providerId } = req.params;
+    const userId = (req as AuthRequest).user!.userId; // <<< 2. GET userId FROM AUTHENTICATED REQUEST
     
     if (!providerId) {
       res.status(400).json({
@@ -59,7 +76,8 @@ router.post('/:providerId/test', async (req: Request, res: Response, next: NextF
       return;
     }
     
-    const provider = await ProviderFactory.getProvider(providerId);
+    // <<< 3. PASS userId TO THE getProvider METHOD
+    const provider = await ProviderFactory.getProvider(providerId, userId); 
     
     // Try a simple operation to test connection
     const result = await provider.execute({
@@ -92,21 +110,25 @@ const executeSchema = z.object({
 
 router.post(
   '/:providerId/execute',
+  authenticate, 
   validate(executeSchema),
-  async (req, res, next) => {
+  // The 'req' parameter here is already implicitly an AuthRequest due to the middleware
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { providerId } = req.params;
+      // No change needed here, this was already correct.
+      const userId = (req as AuthRequest).user!.userId;
       
-      // Validate providerId is present
       if (!providerId) {
         throw BadRequestError('Provider ID is required');
       }
       
       const { operation, params, options } = req.body;
 
-      logger.info(`Executing ${operation} on provider ${providerId}`, { params });
+      logger.info(`Executing ${operation} on provider ${providerId} for user ${userId}`);
 
-      const provider = await ProviderFactory.getProvider(providerId);
+      // No change needed here, this was already correct.
+      const provider = await ProviderFactory.getProvider(providerId, userId);
       const result = await provider.execute({
         operation,
         params,
@@ -132,9 +154,12 @@ const bulkEnrichSchema = z.object({
 
 router.post(
   '/:providerId/bulk',
+  authenticate,
   validate(bulkEnrichSchema),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // No change needed here, this was already correct.
+      const userId = (req as AuthRequest).user!.userId;
       const { providerId } = req.params;
       
       if (!providerId) {
@@ -150,8 +175,10 @@ router.post(
       
       const { operation, records, options } = req.body;
 
+      // No change needed here, this was already correct.
       const jobId = await QueueService.createEnrichmentJob({
         providerId,
+        userId,
         operation,
         records,
         options,

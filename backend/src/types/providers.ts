@@ -39,7 +39,8 @@ export enum ProviderOperation {
 }
 
 export interface ProviderConfig {
-  id: string;
+  id: string; // This is the string name, e.g., "surfe"
+  providerNumericId: number; // <<< ADD THIS LINE for the database ID
   name: string;
   displayName: string;
   category: ProviderCategory;
@@ -119,26 +120,95 @@ export interface EmailResult {
 }
 
 export interface PersonData {
+  id?: string;
   firstName?: string;
   lastName?: string;
   fullName?: string;
   email?: string;
   phone?: string;
   title?: string;
+  jobTitle?: string;
   company?: string;
+  companyName?: string;
+  companyDomain?: string;
   linkedinUrl?: string;
+  linkedInUrl?: string;
+  linkedin_url?: string;
   location?: string;
-  additionalData?: Record<string, any>;
+  country?: string;
+  emails?: Array<{ email: string; validationStatus?: string }> | string[];
+  mobilePhones?: Array<{ mobilePhone: string; confidenceScore?: number }> | string[];
+  seniorities?: string[];
+  departments?: string[];
+  jobHistory?: any[];
+  additionalData?: {
+    seniorities?: string[];
+    departments?: string[];
+    emailValidation?: string;
+    phoneConfidence?: number;
+    country?: string;
+    jobHistory?: any[];
+    rawResponse?: any;
+    [key: string]: any;
+  };
+  [key: string]: any;
 }
 
+/**
+ * Represents the standardized, enriched data for a single company
+ * after being processed by a provider. This structure is based on
+ * the detailed Surfe API response for company enrichment.
+ */
 export interface CompanyData {
+  // Core, most important fields
   name: string;
   domain: string;
   description?: string;
   industry?: string;
-  size?: string;
-  location?: string;
+  size?: string; // Standardized as a string range (e.g., "51-200")
+  location?: string; // Standardized as the primary HQ address string
   linkedinUrl?: string;
+  
+  // Keywords/Technologies, standardized under one name
   technologies?: string[];
-  additionalData?: Record<string, any>;
+
+  // All other detailed, provider-specific data goes into additionalData
+  additionalData?: {
+    // From the Surfe response
+    employeeCount?: number; // The raw number
+    founded?: string;
+    revenue?: string; // The raw string range
+    hqCountry?: string;
+    subIndustry?: string;
+    isPublic?: boolean;
+    followersCountLinkedin?: number;
+    phones?: string[];
+    websites?: string[];
+    
+    // Nested objects can be stored as-is or typed out
+    digitalPresence?: { name?: string; url?: string; }[];
+    fundingRounds?: {
+      amount?: number;
+      amountCurrency?: string;
+      announcedDate?: string;
+      leadInvestors?: string[];
+      name?: string;
+    }[];
+    ipo?: {
+      date?: string;
+      sharePrice?: number;
+      sharePriceCurrency?: string;
+    };
+    parentOrganization?: {
+      name?: string;
+      website?: string;
+    };
+    stocks?: {
+      exchange?: string;
+      ticker?: string;
+    }[];
+    
+    // Any other fields from other providers can also go here
+    [key: string]: any;
+  };
 }

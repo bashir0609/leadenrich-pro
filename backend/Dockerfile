@@ -1,67 +1,51 @@
-# ===== Stage 1: Build Stage =====
-# This stage installs dependencies and compiles the TypeScript code.
-FROM node:18-alpine AS build
+# Backend Dockerfile
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files first to leverage Docker cache
-COPY package.json package-lock.json* ./
+# Install dependencies based on the preferred package manager
+COPY package*.json ./
+RUN npm install --only=production
 
-# Install dependencies using npm ci for consistency
-RUN npm ci
-
-# Copy the Prisma schema to generate the client
-# This layer is only invalidated if the schema changes
-COPY prisma ./prisma
-RUN npx prisma generate
-
-# Copy the rest of the source code
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
+RUN npm install
 COPY . .
 
-# Make the wait-for-it script executable
-RUN chmod +x ./scripts/wait-for-it.sh
+# Generate Prisma client
+RUN npx prisma generate
 
-# Compile the TypeScript project
+# Build the application
 RUN npm run build
 
-# Install tsc-alias globally within the build stage to resolve path aliases
-# This is run after the build to process the output files
-RUN npm install -g tsc-alias
-RUN tsc-alias -p tsconfig.json
-
-
-# ===== Stage 2: Production Stage =====
-# This stage creates a lean production image with only necessary files.
-FROM node:18-alpine
+# Production image, copy all the files and run the app
+FROM base AS runner
 WORKDIR /app
 
-# Add bash for the wait-for-it script and openssl for Prisma
-RUN apk add --no-cache bash openssl
+ENV NODE_ENV production
 
-# Create a non-root user for better security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
 
-# Copy compiled code and necessary assets from the build stage
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/scripts ./scripts
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+# Copy built application
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/tsconfig.json ./
 
-# Copy package files to install only production dependencies
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/package-lock.json ./package-lock.json
+# Create uploads directory
+RUN mkdir -p uploads logs && chown nodejs:nodejs uploads logs
 
-# Install only production dependencies to keep the image small
-RUN npm ci --only=production
-
-# Change ownership of the app directory to the non-root user
-RUN chown -R nodejs:nodejs /app
-
-# Switch to the non-root user
 USER nodejs
 
-# Expose the application port
 EXPOSE 3001
 
-# The default command to run the application
-CMD [ "node", "dist/app.js" ]
+# Run database migrations and start the server
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import { RateLimitInfo } from 'express-rate-limit';
-import { AuthRequest } from '@/middleware/auth';
+import { AuthRequest } from '../middleware/auth';
 import { Multer } from 'multer';
 import { ReadableStream, WritableStream } from 'stream';
 import { Key, Listener1, Listener2, Args, Key2 } from 'node:events';

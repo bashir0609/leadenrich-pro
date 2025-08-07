@@ -7,3 +7,4 @@ export declare class MetricsService {
     private static getJobStatistics;
     private static getProviderStatistics;
 }
+//# sourceMappingURL=MetricsService.d.ts.map

@@ -9,3 +9,4 @@ export declare class CacheService {
     static cacheProviderResponse(provider: string, operation: string, params: any, response: any, ttl?: number): Promise<void>;
     static getCachedProviderResponse(provider: string, operation: string, params: any): Promise<any | null>;
 }
+//# sourceMappingURL=CacheService.d.ts.map

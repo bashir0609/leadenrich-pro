@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { upload } from '@/middleware/upload';
-import { FileProcessingService } from '@/services/FileProcessingService';
-import { logger } from '@/utils/logger';
+import { upload } from '../middleware/upload';
+import { FileProcessingService } from '../services/FileProcessingService';
+import { logger } from '../utils/logger';
 
 const router = Router();
 

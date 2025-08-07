@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocket = void 0;
 const socket_io_1 = require("socket.io");
-const logger_1 = require("@/utils/logger");
+const logger_1 = require("../utils/logger");
 const setupSocket = (server) => {
     const io = new socket_io_1.Server(server, {
         cors: {

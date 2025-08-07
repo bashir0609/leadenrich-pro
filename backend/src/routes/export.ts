@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validate } from '@/utils/validation';
-import { ExportService } from '@/services/ExportService';
+import { validate } from '../utils/validation';
+import { ExportService } from '../services/ExportService';
 import fs from 'fs';
 import path from 'path';
-import { NotFoundError } from '@/types/errors';
+import { NotFoundError } from '../types/errors';
 
 const router = Router();
 

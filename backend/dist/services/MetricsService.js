@@ -22,11 +22,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsService = void 0;
-const client_1 = require("@prisma/client");
 const prometheus = __importStar(require("prom-client"));
-const prisma = new client_1.PrismaClient();
+const prisma_1 = __importDefault(require("../lib/prisma"));
 // Initialize Prometheus metrics
 const register = new prometheus.Registry();
 // Default metrics
@@ -70,7 +72,7 @@ class MetricsService {
         }
     }
     static async updateActiveJobs() {
-        const activeJobs = await prisma.enrichmentJob.count({
+        const activeJobs = await prisma_1.default.enrichmentJob.count({
             where: {
                 status: {
                     in: ['queued', 'processing'],
@@ -98,7 +100,7 @@ class MetricsService {
         };
     }
     static async getJobStatistics() {
-        const stats = await prisma.enrichmentJob.groupBy({
+        const stats = await prisma_1.default.enrichmentJob.groupBy({
             by: ['status'],
             _count: true,
         });
@@ -110,7 +112,7 @@ class MetricsService {
     static async getProviderStatistics() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const usage = await prisma.apiUsage.groupBy({
+        const usage = await prisma_1.default.apiUsage.groupBy({
             by: ['providerId'],
             where: {
                 timestamp: {

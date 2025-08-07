@@ -1,10 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
-import { CustomError, ErrorCode } from '@/types/errors';
-import { logger } from '@/utils/logger';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
+import { CustomError, ErrorCode } from '../types/errors';
+import { logger } from '../utils/logger';
 
 export interface AuthTokenPayload {
   userId: string;
@@ -28,10 +26,11 @@ export class AuthService {
   private static readonly SALT_ROUNDS = 10;
 
   static async register(data: RegisterData): Promise<{ user: any; token: string }> {
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
-    });
+    try {
+      // Check if user exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email: data.email },
+      });
 
     if (existingUser) {
       throw new CustomError(
@@ -63,13 +62,26 @@ export class AuthService {
       user: this.sanitizeUser(user),
       token,
     };
+    } catch (error: any) {
+      // Handle database connection errors
+      if (error.code === 'P1000' || error.message?.includes('authentication failed')) {
+        throw new CustomError(
+          ErrorCode.DATABASE_ERROR,
+          'Database user does not exist. Please contact administrator.',
+          503
+        );
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   static async login(credentials: LoginCredentials): Promise<{ user: any; token: string }> {
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: credentials.email },
-    });
+    try {
+      // Find user
+      const user = await prisma.user.findUnique({
+        where: { email: credentials.email },
+      });
 
     if (!user) {
       throw new CustomError(
@@ -105,6 +117,18 @@ export class AuthService {
       user: this.sanitizeUser(user),
       token,
     };
+    } catch (error: any) {
+      // Handle database connection errors
+      if (error.code === 'P1000' || error.message?.includes('authentication failed')) {
+        throw new CustomError(
+          ErrorCode.DATABASE_ERROR,
+          'Database user does not exist. Please contact administrator.',
+          503
+        );
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   static async verifyToken(token: string): Promise<AuthTokenPayload> {

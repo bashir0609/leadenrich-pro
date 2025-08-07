@@ -1,7 +1,7 @@
 import { ProviderFactory } from './providers/ProviderFactory';
-import { logger } from '@/utils/logger';
-import { CustomError, ErrorCode } from '@/types/errors';
-import { ProviderOperation, ProviderResponse } from '@/types/providers';
+import { logger } from '../utils/logger';
+import { CustomError, ErrorCode } from '../types/errors';
+import { ProviderOperation, ProviderResponse } from '../types/providers';
 
 export interface WaterfallConfig {
   operation: ProviderOperation;
@@ -45,7 +45,8 @@ export interface WaterfallAttempt {
 export class WaterfallService {
   static async execute(
     config: WaterfallConfig,
-    params: any
+    params: any,
+    userId: string // <<< 1. ADD THE userId PARAMETER HERE
   ): Promise<WaterfallResult> {
     const startTime = Date.now();
     const attempts: WaterfallAttempt[] = [];
@@ -64,7 +65,8 @@ export class WaterfallService {
       }
 
       try {
-        const provider = await ProviderFactory.getProvider(step.providerId);
+        // <<< 2. PASS THE userId TO THE FACTORY CALL <<<
+        const provider = await ProviderFactory.getProvider(step.providerId, userId);
         const attemptStart = Date.now();
 
         const result = await provider.execute({

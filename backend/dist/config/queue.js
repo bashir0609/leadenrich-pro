@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.enrichmentQueueEvents = exports.exportQueue = exports.enrichmentQueue = void 0;
 const bullmq_1 = require("bullmq");
 const ioredis_1 = __importDefault(require("ioredis"));
-const logger_1 = require("@/utils/logger");
+const logger_1 = require("../utils/logger");
 // Redis connection
 const connection = new ioredis_1.default({
     host: process.env.REDIS_HOST || 'localhost',

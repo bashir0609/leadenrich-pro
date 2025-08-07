@@ -1,8 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import { logger } from '@/utils/logger';
 import * as prometheus from 'prom-client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 // Initialize Prometheus metrics
 const register = new prometheus.Registry();

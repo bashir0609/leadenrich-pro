@@ -1,4 +1,4 @@
-import { ProviderOperation } from '@/types/providers';
+import { ProviderOperation } from '../types/providers';
 export interface WaterfallConfig {
     operation: ProviderOperation;
     providers: WaterfallStep[];
@@ -34,7 +34,7 @@ export interface WaterfallAttempt {
     duration: number;
 }
 export declare class WaterfallService {
-    static execute(config: WaterfallConfig, params: any): Promise<WaterfallResult>;
+    static execute(config: WaterfallConfig, params: any, userId: string): Promise<WaterfallResult>;
     private static shouldSkipProvider;
     private static mergeData;
     private static calculateDataQuality;
@@ -69,3 +69,4 @@ export declare const WATERFALL_CONFIGS: {
         qualityThreshold: number;
     };
 };
+//# sourceMappingURL=WaterfallService.d.ts.map

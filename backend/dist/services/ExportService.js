@@ -29,15 +29,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ExportService = void 0;
 const csv_writer_1 = require("csv-writer");
 const XLSX = __importStar(require("xlsx"));
-const client_1 = require("@prisma/client");
+const prisma_1 = __importDefault(require("../lib/prisma"));
 const path_1 = __importDefault(require("path"));
 const promises_1 = __importDefault(require("fs/promises"));
-const logger_1 = require("@/utils/logger");
-const errors_1 = require("@/types/errors");
-const prisma = new client_1.PrismaClient();
+const logger_1 = require("../utils/logger");
+const errors_1 = require("../types/errors");
 class ExportService {
     static async exportJobResults(jobId, options) {
-        const job = await prisma.enrichmentJob.findUnique({
+        const job = await prisma_1.default.enrichmentJob.findUnique({
             where: { id: jobId },
         });
         if (!job) {
@@ -47,7 +46,7 @@ class ExportService {
             throw new errors_1.CustomError(errors_1.ErrorCode.OPERATION_FAILED, 'Job must be completed before export', 400);
         }
         // Get results (in real app, this would come from results storage)
-        const results = job.outputData || [];
+        const results = job.outputData ? JSON.parse(job.outputData) : [];
         const exportDir = path_1.default.join(process.cwd(), 'exports');
         await promises_1.default.mkdir(exportDir, { recursive: true });
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

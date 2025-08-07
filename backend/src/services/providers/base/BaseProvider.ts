@@ -3,8 +3,8 @@ import axios, { AxiosInstance } from 'axios';
 import Bottleneck from 'bottleneck';
 import pRetry from 'p-retry';
 import crypto from 'crypto-js';
-import { logger } from '@/utils/logger';
-import { CustomError, ErrorCode } from '@/types/errors';
+import { logger } from '../../../utils/logger';
+import { CustomError, ErrorCode } from '../../../types/errors';
 import {
   ProviderConfig,
   ProviderRequest,
@@ -47,7 +47,9 @@ export abstract class BaseProvider {
   }
 
   // Abstract methods that each provider must implement
-  abstract authenticate(): Promise<void>;
+  // <<< THE CRITICAL FIX IS HERE: Add the optional userId parameter <<<
+  abstract authenticate(userId?: string): Promise<void>;
+  
   abstract validateConfig(): void;
   abstract mapErrorToStandard(error: any): CustomError;
 
@@ -56,9 +58,15 @@ export abstract class BaseProvider {
     const startTime = Date.now();
     const requestId = this.generateRequestId();
 
+    console.log(`🔎 BaseProvider.execute called for ${this.config.name} with operation: ${request.operation}`);
+    console.log(`🔎 Supported operations for ${this.config.name}:`, this.config.supportedOperations);
+
     try {
       // Validate operation is supported
-      if (request.operation !== ('check-enrichment-status' as ProviderOperation) && !this.supportsOperation(request.operation)) {
+      const isSupported = this.supportsOperation(request.operation);
+      console.log(`🔎 Operation ${request.operation} supported by ${this.config.name}: ${isSupported}`);
+      
+      if (request.operation !== ('check-enrichment-status' as ProviderOperation) && !isSupported) {
         throw new CustomError(
           ErrorCode.OPERATION_FAILED,
           `Provider ${this.config.name} does not support operation ${request.operation}`,
@@ -77,7 +85,7 @@ export abstract class BaseProvider {
             pRetry(
               () => this.executeOperation.call(this, request),
               {
-                retries: request.options?.retries || 3,
+                retries: request.options?.retries || 0,
                 factor: 2,
                 minTimeout: 1000,
                 maxTimeout: 10000,
@@ -309,9 +317,10 @@ export abstract class BaseProvider {
   }
 
   // Health check method
-  async healthCheck(): Promise<{ healthy: boolean; message?: string }> {
+  // <<< FIX: The healthCheck also needs to pass the userId if it's going to work correctly <<<
+  async healthCheck(userId?: string): Promise<{ healthy: boolean; message?: string }> {
     try {
-      await this.authenticate();
+      await this.authenticate(userId); // Pass userId here
       return { healthy: true };
     } catch (error) {
       return { 

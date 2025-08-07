@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authorize = exports.authenticate = void 0;
-const AuthService_1 = require("@/services/AuthService");
-const errors_1 = require("@/types/errors");
+const AuthService_1 = require("../services/AuthService");
+const errors_1 = require("../types/errors");
 const authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;

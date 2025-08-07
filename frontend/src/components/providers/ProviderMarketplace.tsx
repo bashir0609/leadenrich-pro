@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useProviders } from '@/lib/api/providers';
+import { Provider } from '@/types';
 import { ProviderCard } from './ProviderCard';
 import { ProviderDetails } from './ProviderDetails';
 import { Input } from '@/components/ui/input';
@@ -10,12 +11,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 
 export function ProviderMarketplace() {
-  const { data: providers, isLoading, error } = useProviders();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
+  const { data: providers, isLoading, error } = useProviders() as {
+    data: Provider[] | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
+
+  console.log('🎯 ProviderMarketplace render:', { providers, isLoading, error });
 
   if (isLoading) {
+    console.log('⏳ Showing loading state...');
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (
@@ -26,24 +34,42 @@ export function ProviderMarketplace() {
   }
 
   if (error) {
+    console.error('❌ ProviderMarketplace error:', error);
     return (
       <div className="text-center py-12">
         <p className="text-red-600">Failed to load providers</p>
+        <p className="text-gray-500 mt-2">Error: {error?.message || 'Unknown error'}</p>
       </div>
     );
   }
 
+  if (!providers || providers.length === 0) {
+    console.log('📭 No providers found');
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600">No providers available</p>
+      </div>
+    );
+  }
+
+  console.log('✅ Providers loaded successfully:', providers);
+
   const categories = Array.from(new Set(providers?.map((p) => p.category) || []));
-  
+
   const filteredProviders = providers?.filter((provider) => {
     const matchesSearch = provider.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      provider.features.some((f) => f.featureName.toLowerCase().includes(searchTerm.toLowerCase()));
+                          provider.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || provider.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   return (
     <div className="space-y-6">
+      {/* Debug info */}
+      <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded">
+        Debug: {providers.length} providers loaded, {filteredProviders?.length} filtered
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">

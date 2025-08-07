@@ -7,8 +7,8 @@ exports.FileProcessingService = void 0;
 const promises_1 = __importDefault(require("fs/promises"));
 const csv_parser_1 = __importDefault(require("csv-parser"));
 const fs_1 = require("fs");
-const logger_1 = require("@/utils/logger");
-const errors_1 = require("@/types/errors");
+const logger_1 = require("../utils/logger");
+const errors_1 = require("../types/errors");
 class FileProcessingService {
     static async parseCSV(filePath) {
         return new Promise((resolve, reject) => {

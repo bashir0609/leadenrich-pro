@@ -28,11 +28,11 @@ export declare enum ProviderOperation {
     ENRICH_COMPANY = "enrich-company",
     SEARCH_PEOPLE = "search-people",
     SEARCH_COMPANIES = "search-companies",
-    FIND_LOOKALIKE = "find-lookalike",
-    CHECK_ENRICHMENT_STATUS = "check-enrichment-status"
+    FIND_LOOKALIKE = "find-lookalike"
 }
 export interface ProviderConfig {
     id: string;
+    providerNumericId: number;
     name: string;
     displayName: string;
     category: ProviderCategory;
@@ -116,6 +116,11 @@ export interface PersonData {
     location?: string;
     additionalData?: Record<string, any>;
 }
+/**
+ * Represents the standardized, enriched data for a single company
+ * after being processed by a provider. This structure is based on
+ * the detailed Surfe API response for company enrichment.
+ */
 export interface CompanyData {
     name: string;
     domain: string;
@@ -125,5 +130,41 @@ export interface CompanyData {
     location?: string;
     linkedinUrl?: string;
     technologies?: string[];
-    additionalData?: Record<string, any>;
+    additionalData?: {
+        employeeCount?: number;
+        founded?: string;
+        revenue?: string;
+        hqCountry?: string;
+        subIndustry?: string;
+        isPublic?: boolean;
+        followersCountLinkedin?: number;
+        phones?: string[];
+        websites?: string[];
+        digitalPresence?: {
+            name?: string;
+            url?: string;
+        }[];
+        fundingRounds?: {
+            amount?: number;
+            amountCurrency?: string;
+            announcedDate?: string;
+            leadInvestors?: string[];
+            name?: string;
+        }[];
+        ipo?: {
+            date?: string;
+            sharePrice?: number;
+            sharePriceCurrency?: string;
+        };
+        parentOrganization?: {
+            name?: string;
+            website?: string;
+        };
+        stocks?: {
+            exchange?: string;
+            ticker?: string;
+        }[];
+        [key: string]: any;
+    };
 }
+//# sourceMappingURL=providers.d.ts.map

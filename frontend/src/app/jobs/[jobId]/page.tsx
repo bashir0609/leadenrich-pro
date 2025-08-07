@@ -1,3 +1,4 @@
+// frontend/src/app/jobs/[jobId]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api/client';
 import { socketManager } from '@/lib/socket';
-import { Job } from '@/types';
+import { Job, CompanyData, PersonData } from '@/types';
 import { CheckCircle2, XCircle, Loader2, Download, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import Papa from 'papaparse';
 
 export default function JobDetailsPage() {
   const params = useParams();
@@ -69,27 +71,103 @@ export default function JobDetailsPage() {
     : 0;
 
   const getStatusBadge = () => {
+    const statusToShow = job.displayStatus || job.status;
+    
     const variants: Record<string, any> = {
       queued: { variant: 'secondary', icon: Loader2 },
       processing: { variant: 'default', icon: Loader2 },
       completed: { variant: 'success', icon: CheckCircle2 },
       failed: { variant: 'destructive', icon: XCircle },
+      expired: { variant: 'outline', icon: CheckCircle2 }, // New variant for expired jobs
     };
 
-    const config = variants[job.status];
+    const config = variants[statusToShow] || variants.queued;
     const Icon = config.icon;
 
     return (
       <Badge variant={config.variant}>
         <Icon className="h-3 w-3 mr-1" />
-        {job.status}
+        {statusToShow}
       </Badge>
     );
   };
 
-  const handleExport = async () => {
-    // Export functionality would be implemented here
-    toast.success('Export functionality coming soon!');
+  const handleExport = () => {
+    // Diagnostic log to see the raw data
+    console.log('Inspecting job.results for export:', job?.results);
+
+    if (job?.status !== 'completed' || !job.results || job.results.length === 0) {
+      toast.error('No successful results to export.');
+      return;
+    }
+
+    try {
+      let dataToExport;
+
+      if (job.jobType === 'enrich-person') {
+        dataToExport = (job.results as PersonData[]).map(p => ({
+          'Full Name': p.fullName,
+          'First Name': p.firstName,
+          'Last Name': p.lastName,
+          'Email': p.email,
+          'Phone': p.phone,
+          'Job Title': p.title,
+          'Company Name': p.company,
+          'Company Domain': p.companyDomain,
+          'LinkedIn URL': p.linkedinUrl,
+          'Location': p.location,
+          // --- THE CRITICAL FIX IS HERE: Flatten the additionalData ---
+          'Seniority': p.additionalData?.seniorities?.join('; '),
+          'Departments': p.additionalData?.departments?.join('; '),
+        }));
+      } else if (job.jobType === 'enrich-company') {
+        // --- THIS IS THE FINAL, CORRECT MAPPING ---
+        dataToExport = (job.results as CompanyData[]).map(c => ({
+          // Use optional chaining and nullish coalescing (??) for safety
+          'Name': c.name ?? '',
+          'Domain': c.domain ?? '',
+          'Description': c.description ?? '',
+          'Industry': c.industry ?? '',
+          'Size': c.size ?? '',
+          'Location': c.location ?? '',
+          'LinkedIn URL': c.linkedinUrl ?? '',
+          
+          // Correctly and safely access nested additionalData
+          'Employee Count': c.additionalData?.employeeCount ?? 'N/A',
+          'Founded': c.additionalData?.founded ?? 'N/A',
+          'Revenue': c.additionalData?.revenue ?? 'N/A',
+          'HQ Country': c.additionalData?.hqCountry ?? 'N/A',
+          'Is Public': c.additionalData?.isPublic ?? 'N/A',
+          
+          'Technologies': c.technologies?.join('; ') ?? '',
+          'Phones': c.additionalData?.phones?.join('; ') ?? '',
+          'Websites': c.additionalData?.websites?.join('; ') ?? '',
+        }));
+      } else {
+        // Fallback for unknown job types
+        dataToExport = job.results;
+        toast.success("Exporting raw JSON for unknown job type.");
+      }
+
+      // --- 2. USE THE FLATTENED DATA FOR THE EXPORT ---
+      const csv = Papa.unparse(dataToExport);
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `job-results-${jobId}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Results exported successfully!');
+
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+      toast.error('An error occurred during export.');
+    }
   };
 
   return (

@@ -12,12 +12,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { ArrowLeft, Search, Loader2, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Provider, PersonSearchResult, PeopleSearchApiResponse } from '@/types';
 
 // Import necessary hooks and services
 import { useProviderStore } from '@/lib/stores/providerStore';
 import { useProviders } from '@/lib/api/providers';
 import { useExecuteProvider } from '@/lib/api/providers';
 import { DataCleaningService } from '@/utils/dataCleaning';
+import { ProviderError } from '@/components/ui/provider-error';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { getSeniorityOptions, getDepartmentOptions, getIndustryOptions, getCountryOptions } from '@/lib/constants/filterData';
 
 export default function PeopleSearchPage() {
   // Navigation and routing
@@ -27,11 +31,30 @@ export default function PeopleSearchPage() {
 
   // State management hooks
   const { selectedProvider, setSelectedProvider } = useProviderStore();
-  const { data: providers, isLoading: isProvidersLoading } = useProviders();
+  
+  const { data: providers, isLoading: isProvidersLoading } = useProviders() as { 
+    data: Provider[] | undefined; 
+    isLoading: boolean;
+  };
+
   const executeProvider = useExecuteProvider();
 
   // Hydration-safe state
   const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  
+  // Provider selection effect
+  useEffect(() => {
+    if (isClient && Array.isArray(providers) && providers.length > 0 && urlProviderName) {
+      const provider = providers.find(p => p.name === urlProviderName);
+      if (provider) {
+        setSelectedProvider(provider);
+      }
+    }
+  }, [isClient, providers, urlProviderName, setSelectedProvider]);
 
   // Search state
   const [searchParams, setSearchParams] = useState({
@@ -52,8 +75,9 @@ export default function PeopleSearchPage() {
     departments: [] as string[],
     peopleCountries: [] as string[],
     
-    // Configuration
-    limit: 25,
+    // Pagination and configuration
+    pageToken: '', // For pagination with Surfe API
+    limit: 10,
     peoplePerCompany: 5,
   });
 
@@ -79,32 +103,100 @@ export default function PeopleSearchPage() {
   const [totalResults, setTotalResults] = useState(0);
 
   // Results and pagination state
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<PersonSearchResult[]>([]);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalResults: 0,
     nextPageToken: '',
   });
+  
+  // Function to load more results using pageToken
+  const handleLoadMore = async () => {
+    if (!pagination.nextPageToken) {
+      toast('No more results available');
+      return;
+    }
+    
+    setIsSearchLoading(true);
+    
+    try {
+      const result = await executeProvider.mutateAsync({
+        providerId: selectedProvider?.name || '',
+        operation: 'search-people',
+        params: {
+          companies: {
+            domains: searchParams.companyDomains.length > 0 ? searchParams.companyDomains : undefined,
+            domainsExcluded: searchParams.excludeDomains.length > 0 ? searchParams.excludeDomains : undefined,
+            names: searchParams.companyNames.length > 0 ? searchParams.companyNames : undefined,
+            industries: searchParams.industries.length > 0 ? searchParams.industries : undefined,
+            countries: searchParams.companyCountries.length > 0 ? searchParams.companyCountries : undefined,
+            employeeCount: (searchParams.minEmployees || searchParams.maxEmployees) ? {
+              from: parseInt(searchParams.minEmployees) || 1,
+              to: parseInt(searchParams.maxEmployees) || 999999999
+            } : undefined,
+            revenue: (searchParams.minRevenue || searchParams.maxRevenue) ? {
+              from: parseInt(searchParams.minRevenue) || 1,
+              to: parseInt(searchParams.maxRevenue) || 999999999
+            } : undefined,
+          },
+          people: {
+            jobTitles: searchParams.jobTitles.length > 0 ? searchParams.jobTitles : undefined,
+            seniorities: searchParams.seniorities.length > 0 ? searchParams.seniorities : undefined,
+            departments: searchParams.departments.length > 0 ? searchParams.departments : undefined,
+            countries: searchParams.peopleCountries.length > 0 ? searchParams.peopleCountries : undefined,
+          },
+          limit: searchParams.limit,
+          pageToken: pagination.nextPageToken,
+          peoplePerCompany: searchParams.peoplePerCompany,
+        },
+      });
+
+      console.log('🔍 RAW API RESULT:', result);
+      console.log('🔍 Result success:', result.success);
+      console.log('🔍 Result data:', result.data);
+      console.log('🔍 Result data type:', typeof result.data);
+      console.log('🔍 Is people array?', Array.isArray(result.data?.people));
+      console.log('🔍 People length:', result.data?.people?.length);
+      
+      if (result.success && result.data && Array.isArray(result.data.people) && result.data.people.length > 0) {
+        const searchResponse = result.data as PeopleSearchApiResponse;
+        
+        // Append new results to existing results
+        setSearchResults(prev => [...prev, ...(searchResponse.people || [])]);
+        
+        // Update pagination
+        setPagination(prev => ({
+          ...prev,
+          nextPageToken: searchResponse.nextPageToken || '',
+          currentPage: prev.currentPage + 1,
+        }));
+        
+        // Update search params with the new nextPageToken
+        setSearchParams(prev => ({
+          ...prev,
+          pageToken: searchResponse.nextPageToken || ''
+        }));
+        
+        toast.success(`Loaded ${searchResponse.people?.length || 0} more results`);
+      } else {
+        toast.error(result.error?.message || 'Failed to load more results');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'A network error occurred while loading more results');
+      console.error("Load more failed:", error);
+    } finally {
+      setIsSearchLoading(false);
+    }
+  };
 
   // Loading state
   const [isSearchLoading, setIsSearchLoading] = useState(false);
 
-  // Hydration effect
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Provider selection effect
-  useEffect(() => {
-    if (isClient && providers && urlProviderName) {
-      const provider = providers.find(p => p.name === urlProviderName);
-      if (provider) {
-        setSelectedProvider(provider);
-      }
-    }
-  }, [isClient, providers, urlProviderName, setSelectedProvider]);
-  
-  
+  // Search error state
+  const [searchError, setSearchError] = useState<{
+    message: string;
+    isProviderError: boolean;
+  } | null>(null);
 
   const [csvImportModal, setCsvImportModal] = useState<{
     show: boolean;
@@ -137,54 +229,75 @@ export default function PeopleSearchPage() {
 
   // Validation and search handler
   const handleSearch = async () => {
-    // Validate before searching
-    if (!searchParams.companyDomains || searchParams.companyDomains.length === 0  ) {
-      toast.error('Company domain is required');
-      return;
-    }
-
-    // Ensure we have a provider
+    // Ensure we have a provider first
     if (!selectedProvider) {
       toast.error('Please select a provider');
       return;
     }
 
-    // Start loading
+    // For people search, we need at least one company identifier
+    const hasCompanyIdentifier = (
+      searchParams.companyDomains.length > 0 ||
+      searchParams.companyNames.length > 0 ||
+      searchParams.industries.length > 0 ||
+      searchParams.companyCountries.length > 0 ||
+      searchParams.minEmployees ||
+      searchParams.maxEmployees ||
+      searchParams.minRevenue ||
+      searchParams.maxRevenue
+    );
+
+    const hasPeopleFilters = (
+      searchParams.jobTitles.length > 0 ||
+      searchParams.seniorities.length > 0 ||
+      searchParams.departments.length > 0 ||
+      searchParams.peopleCountries.length > 0
+    );
+
+    const canDoSearch = hasCompanyIdentifier || hasPeopleFilters;
+
+    if (!canDoSearch) {
+      toast.error('Please provide either company filters OR people filters to search');
+      return;
+    }
+
     setIsSearchLoading(true);
+    
+    // Clear results only for new searches (not pagination)
+    if (!searchParams.pageToken) {
+      setSearchResults([]);
+      // Reset pagination for new searches
+      setPagination(prev => ({
+        ...prev,
+        currentPage: 1,
+        nextPageToken: '',
+      }));
+    }
+    
+    // Add a small delay before making the request to improve user experience
+    // This gives the loading state time to render and prevents the UI from feeling jumpy
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
-      // Construct Surfe-specific payload
-      const surfePayload = {
-        companies: {
-          domains: [searchParams.companyDomains],
-          countries: searchParams.companyCountries ? [searchParams.companyCountries] : [],
-          // Optional additional company filters can be added here
-          employeeCount: {
-            from: 1,
-            to: 999999999999999
-          }
-        },
-        people: {
-          jobTitles: searchParams.jobTitles ? [searchParams.jobTitles] : [],
-          seniorities: searchParams.seniorities ? [searchParams.seniorities] : [],
-          departments: searchParams.departments ? [searchParams.departments] : [],
-          countries: searchParams.peopleCountries ? [searchParams.peopleCountries] : []
-        },
-        limit: 10,
-        pageToken: pagination.nextPageToken || '',
-        peoplePerCompany: 5
-      };
-
+      // Build request payload according to Surfe API v2 documentation
+      // https://api.surfe.com/v2/people/search endpoint structure
+      // Build request payload according to Surfe API v2 documentation
       const result = await executeProvider.mutateAsync({
         providerId: selectedProvider.name,
         operation: 'search-people',
         params: {
+          // Companies section - required for Surfe API
           companies: {
+            // Company identifiers (at least one is required)
             domains: searchParams.companyDomains.length > 0 ? searchParams.companyDomains : undefined,
             domainsExcluded: searchParams.excludeDomains.length > 0 ? searchParams.excludeDomains : undefined,
             names: searchParams.companyNames.length > 0 ? searchParams.companyNames : undefined,
+            
+            // Company filters
             industries: searchParams.industries.length > 0 ? searchParams.industries : undefined,
             countries: searchParams.companyCountries.length > 0 ? searchParams.companyCountries : undefined,
+            
+            // Range filters with proper structure
             employeeCount: (searchParams.minEmployees || searchParams.maxEmployees) ? {
               from: parseInt(searchParams.minEmployees) || 1,
               to: parseInt(searchParams.maxEmployees) || 999999999
@@ -194,49 +307,126 @@ export default function PeopleSearchPage() {
               to: parseInt(searchParams.maxRevenue) || 999999999
             } : undefined,
           },
+          // People section - optional filters
           people: {
             jobTitles: searchParams.jobTitles.length > 0 ? searchParams.jobTitles : undefined,
             seniorities: searchParams.seniorities.length > 0 ? searchParams.seniorities : undefined,
             departments: searchParams.departments.length > 0 ? searchParams.departments : undefined,
             countries: searchParams.peopleCountries.length > 0 ? searchParams.peopleCountries : undefined,
           },
-          limit: searchParams.limit,
-          peoplePerCompany: searchParams.peoplePerCompany,
-          pageToken: "",
+          // Pagination and limits
+          limit: searchParams.limit || 10,
+          pageToken: searchParams.pageToken || '', // Include pageToken for pagination support
+          peoplePerCompany: searchParams.peoplePerCompany || 5,
         },
       });
 
-      // Process successful search
-      if (result.success && result.data?.people) {
-        setSearchResults(result.data.people);
+      // Handle the Surfe API response
+      if (result.success && result.data && Array.isArray(result.data.people) && result.data.people.length > 0) {
+        const searchResponse = result.data as PeopleSearchApiResponse;
+
+        console.log('🔍 Frontend received data:', searchResponse);
+console.log('🔍 People array:', searchResponse.people);
+console.log('🔍 Total:', searchResponse.total);
+        
+        // Update search results - append for pagination, replace for new searches
+        if (searchParams.pageToken) {
+          // Append results for pagination
+          setSearchResults(prev => [...prev, ...(searchResponse.people || [])]);
+        } else {
+          // Replace results for new searches
+          setSearchResults(searchResponse.people || []);
+        }
+        
+        // Update pagination state with nextPageToken from Surfe API
         setPagination(prev => ({
           ...prev,
-          totalResults: result.data.total || result.data.people.length,
-          nextPageToken: result.data.nextPageToken || '',
+          totalResults: searchResponse.total || (searchResponse.people?.length || 0),
+          nextPageToken: searchResponse.nextPageToken || '',
+          currentPage: searchParams.pageToken ? prev.currentPage + 1 : 1,
+        }));
+        
+        // Update search params with the nextPageToken for subsequent searches
+        setSearchParams(prev => ({
+          ...prev,
+          pageToken: searchResponse.nextPageToken || ''
         }));
 
-        // Notify success
-        toast.success(`Found ${result.data.total || result.data.people.length} results`);
+        // Show appropriate success message
+        if (searchParams.pageToken) {
+          toast.success(`Loaded ${searchResponse.people?.length || 0} more results`);
+        } else {
+          toast.success(`Found ${searchResponse.total || (searchResponse.people?.length || 0)} results`);
+        }
       } else {
-        // Handle no results
-        toast.error(result.error?.message || 'No results found');
+        // Handle API errors where success is false
+        const errorMessage = result.error?.message || 'No results found or an error occurred.';
+        
+        // Clear previous search results
         setSearchResults([]);
+        
+        // Add a delay before showing the error to improve user experience
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if it's a Surfe provider error (500 Internal Server Error)
+        if (errorMessage.includes('Surfe provider error') || errorMessage.includes('500')) {
+          // Set the error state for the ProviderError component
+          setSearchError({
+            message: 'The Surfe API is currently experiencing issues. This is not an issue with your search parameters or our application. Please try again later or contact Surfe support if the problem persists.',
+            isProviderError: true
+          });
+          
+          // Still show a toast for immediate feedback
+          toast.error('Surfe API error: The service is currently unavailable', { duration: 3000 });
+        } else {
+          // Set a generic error
+          setSearchError({
+            message: errorMessage,
+            isProviderError: false
+          });
+          toast.error(errorMessage);
+        }
       }
-    } catch (error) {
-      // Handle search error
-      toast.error('Search failed. Please try again.');
-      console.error(error);
+    } catch (error: any) {
+      // Handle network errors or other exceptions
+      console.error("Search failed:", error);
+      
+      // Clear previous search results
+      setSearchResults([]);
+      
+      // Add a delay before showing the error to improve user experience
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Provide more specific error messages based on error type
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('Network')) {
+        setSearchError({
+          message: 'Network connection error. Please check your internet connection and try again.',
+          isProviderError: false
+        });
+        toast.error('Network connection error');
+      } else if (error.message?.includes('Surfe') || error.message?.includes('500')) {
+        setSearchError({
+          message: 'The Surfe API is currently experiencing issues. Please try again later or contact Surfe support if the problem persists.',
+          isProviderError: true
+        });
+        toast.error('Surfe API error: The service is currently unavailable', { duration: 3000 });
+      } else {
+        setSearchError({
+          message: error.message || 'A network error occurred. Please check your connection and try again.',
+          isProviderError: false
+        });
+        toast.error(error.message || 'A network error occurred', { duration: 3000 });
+      }
     } finally {
-      // Stop loading
+      // 5. Unset Loading State
       setIsSearchLoading(false);
     }
   };
 
   // Pagination handlers
   const handleNextPage = () => {
-    if (pagination.nextPageToken) {
-      handleSearch();
-    }
+    // Use the new handleLoadMore function for pagination
+    handleLoadMore();
   };
   
   const handleExport = () => {
@@ -379,7 +569,7 @@ export default function PeopleSearchPage() {
         <CardHeader>
           <CardTitle>Search People</CardTitle>
           <CardDescription>
-            Find contacts across companies using multiple filters
+            Find contacts across companies using multiple filters. <strong>Note:</strong> You can search by company filters (domains, names, industries) OR by people filters (job titles, departments, seniority) or both.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -404,75 +594,48 @@ export default function PeopleSearchPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Seniority Levels</Label>
-                  <Select 
-                    value={searchParams.seniorities[0] || ''}
+                  <Label>Seniority Level</Label>
+                  <SearchableSelect
+                    options={getSeniorityOptions()}
+                    value={searchParams.seniorities}
                     onValueChange={(value) => setSearchParams(prev => ({
                       ...prev, 
-                      seniorities: value ? [value] : []
+                      seniorities: value
                     }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select seniority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Any">Any Seniority</SelectItem>
-                      <SelectItem value="Founder">Founder</SelectItem>
-                      <SelectItem value="C-Level">C-Level</SelectItem>
-                      <SelectItem value="VP">VP</SelectItem>
-                      <SelectItem value="Director">Director</SelectItem>
-                      <SelectItem value="Manager">Manager</SelectItem>
-                      <SelectItem value="Individual">Individual</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select seniority levels..."
+                    searchPlaceholder="Search seniorities..."
+                    multiple={true}
+                  />
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Departments</Label>
-                  <Select 
-                    value={searchParams.departments[0] || ''}
+                  <SearchableSelect
+                    options={getDepartmentOptions()}
+                    value={searchParams.departments}
                     onValueChange={(value) => setSearchParams(prev => ({
                       ...prev, 
-                      departments: value ? [value] : []
+                      departments: value
                     }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Any">Any Department</SelectItem>
-                      <SelectItem value="Engineering">Engineering</SelectItem>
-                      <SelectItem value="Sales">Sales</SelectItem>
-                      <SelectItem value="Marketing">Marketing</SelectItem>
-                      <SelectItem value="Management">Management</SelectItem>
-                      <SelectItem value="Operations">Operations</SelectItem>
-                      <SelectItem value="Finance">Finance</SelectItem>
-                      <SelectItem value="HR">Human Resources</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select departments..."
+                    searchPlaceholder="Search departments..."
+                    multiple={true}
+                  />
                 </div>
                 
                 <div className="space-y-2">
                   <Label>People Location</Label>
-                  <Select 
-                    value={searchParams.peopleCountries[0] || ''}
+                  <SearchableSelect
+                    options={getCountryOptions()}
+                    value={searchParams.peopleCountries}
                     onValueChange={(value) => setSearchParams(prev => ({
                       ...prev, 
-                      peopleCountries: value ? [value] : []
+                      peopleCountries: value
                     }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Any location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Any">Any Country</SelectItem>
-                      <SelectItem value="us">United States</SelectItem>
-                      <SelectItem value="fr">France</SelectItem>
-                      <SelectItem value="gb">United Kingdom</SelectItem>
-                      <SelectItem value="de">Germany</SelectItem>
-                      <SelectItem value="ca">Canada</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select countries..."
+                    searchPlaceholder="Search countries..."
+                    multiple={true}
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -581,6 +744,38 @@ export default function PeopleSearchPage() {
                       <SelectItem value="de">Germany</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Industries</Label>
+                    <SearchableSelect
+                      options={getIndustryOptions()}
+                      value={searchParams.industries}
+                      onValueChange={(value) => setSearchParams(prev => ({
+                        ...prev, 
+                        industries: value
+                      }))}
+                      placeholder="Select industries..."
+                      searchPlaceholder="Search industries..."
+                      multiple={true}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Company Location</Label>
+                    <SearchableSelect
+                      options={getCountryOptions()}
+                      value={searchParams.companyCountries}
+                      onValueChange={(value) => setSearchParams(prev => ({
+                        ...prev, 
+                        companyCountries: value
+                      }))}
+                      placeholder="Select countries..."
+                      searchPlaceholder="Search countries..."
+                      multiple={true}
+                    />
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
@@ -695,7 +890,18 @@ export default function PeopleSearchPage() {
       </Card>
 
       {/* Results Section */}
-      {searchResults.length > 0 && (
+      {searchError ? (
+         <ProviderError 
+           message={searchError.message} 
+           isProviderError={searchError.isProviderError} 
+           providerName="Surfe"
+           supportEmail="api.support@surfe.com"
+           onRetry={() => {
+             setSearchError(null);
+             handleSearch();
+           }}
+         />
+       ) : searchResults.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -710,12 +916,6 @@ export default function PeopleSearchPage() {
                 Export CSV
               </Button>
             </div>
-          </CardHeader>
-          <CardHeader>
-            <CardTitle>Search Results</CardTitle>
-            <CardDescription>
-              {pagination.totalResults} people found
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -756,13 +956,20 @@ export default function PeopleSearchPage() {
             <div className="flex justify-between items-center mt-4">
               <Button 
                 variant="outline"
-                disabled={!pagination.nextPageToken}
-                onClick={handleNextPage}
+                disabled={!pagination.nextPageToken || isSearchLoading}
+                onClick={handleLoadMore}
               >
-                Next Page
+                {isSearchLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading more...
+                  </>
+                ) : (
+                  <>Load More Results</>
+                )}
               </Button>
               <span>
-                Total Results: {pagination.totalResults}
+                Showing {searchResults.length} of {pagination.totalResults} results
               </span>
             </div>
           </CardContent>

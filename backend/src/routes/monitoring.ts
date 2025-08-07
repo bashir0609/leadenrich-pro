@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { MetricsService } from '@/services/MetricsService';
-import { authenticate, authorize } from '@/middleware/auth';
+import { MetricsService } from '../services/MetricsService';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 

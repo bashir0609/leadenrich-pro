@@ -8,11 +8,12 @@ export declare const schemas: {
         page: z.ZodDefault<z.ZodNumber>;
         limit: z.ZodDefault<z.ZodNumber>;
     }, "strip", z.ZodTypeAny, {
-        page: number;
         limit: number;
+        page: number;
     }, {
-        page?: number | undefined;
         limit?: number | undefined;
+        page?: number | undefined;
     }>;
 };
 export declare const validate: (schema: z.ZodSchema) => (req: Request, res: Response, next: NextFunction) => Promise<void>;
+//# sourceMappingURL=validation.d.ts.map

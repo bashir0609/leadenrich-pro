@@ -1,8 +1,10 @@
 import { BaseProvider } from '../base/BaseProvider';
-import { CustomError } from '@/types/errors';
-import { ProviderOperation, ProviderRequest } from '@/types/providers';
+import { CustomError } from '../../../types/errors';
+import { ProviderOperation, ProviderRequest } from '../../../types/providers';
 export declare class SurfeProvider extends BaseProvider {
-    authenticate(): Promise<void>;
+    static statusCheckCounts: Map<string, number>;
+    isAuthenticated: boolean;
+    authenticate(userId?: string): Promise<void>;
     validateConfig(): void;
     mapErrorToStandard(error: any): CustomError;
     protected executeOperation(request: ProviderRequest): Promise<any>;
@@ -15,5 +17,5 @@ export declare class SurfeProvider extends BaseProvider {
     private searchCompanies;
     private findLookalike;
     protected calculateCredits(operation: ProviderOperation): number;
-    protected sleep(ms: number): Promise<void>;
 }
+//# sourceMappingURL=SurfeProvider.d.ts.map

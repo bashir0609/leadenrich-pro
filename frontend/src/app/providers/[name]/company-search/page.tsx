@@ -18,6 +18,9 @@ import { useProviders } from '@/lib/api/providers';
 import { useExecuteProvider } from '@/lib/api/providers';
 import { DataCleaningService } from '@/utils/dataCleaning';
 import axios from 'axios';
+import { Provider } from '@/types';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { getIndustryOptions, getCountryOptions } from '@/lib/constants/filterData';
 
 // TypeScript interfaces with enhanced typing
 interface CompanySearchFilters {
@@ -110,6 +113,24 @@ export default function CompanySearchPage() {
 
   // Loading State
   const [isSearchLoading, setIsSearchLoading] = useState(false);
+
+  useEffect(() => {
+    // We must wait until the 'providers' list has been fetched and is not empty.
+    if (providers && providers.length > 0 && urlProviderName) {
+      // Find the provider object from the fetched list that matches the name in the URL.
+      const providerToSet = providers.find((p: Provider) => p.name === urlProviderName);
+      
+      if (providerToSet) {
+        // If we found a match, set it in our global store.
+        // This will update the UI and make it available for the search handler.
+        setSelectedProvider(providerToSet);
+      } else {
+        // Optional: Handle case where the provider in the URL is not valid.
+        toast.error(`Provider "${urlProviderName}" not found.`);
+        router.push('/providers'); // Redirect to a safe page.
+      }
+    }
+  }, [providers, urlProviderName, setSelectedProvider, router]);
 
   // CSV Domain Upload Handler
   const handleDomainCsvUpload = (field: 'domains' | 'domainsExcluded', event: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,46 +225,60 @@ export default function CompanySearchPage() {
       return;
     }
 
-    // Comprehensive debugging payload
+    // Comprehensive debugging payload with proper filter structure
     const payload = {
       providerId: selectedProvider.name,
       operation: 'search-companies',
       params: {
-        domains: cleanedDomains,
-        excludedDomains: cleanedExcludedDomains,
-        industries: searchParams.industries,
-        countries: searchParams.countries,
-        employeeCountMin: searchParams.minEmployees 
-          ? parseInt(searchParams.minEmployees) 
-          : undefined,
-        employeeCountMax: searchParams.maxEmployees 
-          ? parseInt(searchParams.maxEmployees) 
-          : undefined,
-        revenueMin: searchParams.minRevenue 
-          ? parseInt(searchParams.minRevenue) 
-          : undefined,
-        revenueMax: searchParams.maxRevenue 
-          ? parseInt(searchParams.maxRevenue) 
-          : undefined,
+        filters: {
+          domains: cleanedDomains,
+          domainsExcluded: cleanedExcludedDomains,
+          industries: searchParams.industries,
+          countries: searchParams.countries,
+          employeeCount: searchParams.minEmployees || searchParams.maxEmployees 
+            ? {
+                from: parseInt(searchParams.minEmployees) || 1,
+                to: parseInt(searchParams.maxEmployees) || 999999999
+              } 
+            : undefined,
+          revenue: searchParams.minRevenue || searchParams.maxRevenue
+            ? {
+                from: parseInt(searchParams.minRevenue) || 1,
+                to: parseInt(searchParams.maxRevenue) || 999999999
+              }
+            : undefined,
+        },
         limit: Math.min(Math.max(1, searchParams.limit), 200),
         pageToken: pagination.nextPageToken || ''
       }
     };
 
-    // Remove undefined values
-    const cleanedParams = Object.fromEntries(
-      Object.entries(payload.params).filter(([_, value]) => 
-        value !== undefined && 
-        (Array.isArray(value) ? value.length > 0 : true)
-      )
-    );
+    // Remove undefined values and empty arrays in the filters object
+    if (payload.params.filters) {
+      const cleanedFilters: any = {
+        domains: payload.params.filters.domains || [],
+        domainsExcluded: payload.params.filters.domainsExcluded || [],
+        industries: payload.params.filters.industries || [],
+        countries: payload.params.filters.countries || [],
+        employeeCount: payload.params.filters.employeeCount,
+        revenue: payload.params.filters.revenue
+      };
+      
+      // Remove empty arrays and undefined values
+      Object.keys(cleanedFilters).forEach(key => {
+        const value = cleanedFilters[key];
+        if (Array.isArray(value) && value.length === 0) {
+          delete cleanedFilters[key];
+        } else if (value === undefined) {
+          delete cleanedFilters[key];
+        }
+      });
+      
+      payload.params.filters = cleanedFilters;
+    }
 
-    // Updated payload with cleaned params
-    const finalPayload = {
-      providerId: selectedProvider.name,
-      operation: 'search-companies',
-      params: cleanedParams
-    };
+    // Final payload with cleaned parameters
+    const finalPayload = payload;
 
     console.log('Final Payload:', finalPayload);
 
@@ -439,26 +474,32 @@ export default function CompanySearchPage() {
             {/* Industries */}
             <div className="space-y-2">
               <Label>Industries</Label>
-              <Input 
-                placeholder="Software, Technology, SaaS"
-                value={searchParams.industries.join(', ')}
-                onChange={(e) => setSearchParams(prev => ({
-                  ...prev,
-                  industries: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+              <SearchableSelect
+                options={getIndustryOptions()}
+                value={searchParams.industries}
+                onValueChange={(value) => setSearchParams(prev => ({
+                  ...prev, 
+                  industries: value
                 }))}
+                placeholder="Select industries..."
+                searchPlaceholder="Search industries..."
+                multiple={true}
               />
             </div>
 
             {/* Countries */}
             <div className="space-y-2">
               <Label>Countries</Label>
-              <Input 
-                placeholder="US, FR, GB"
-                value={searchParams.countries.join(', ')}
-                onChange={(e) => setSearchParams(prev => ({
-                  ...prev,
-                  countries: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+              <SearchableSelect
+                options={getCountryOptions()}
+                value={searchParams.countries}
+                onValueChange={(value) => setSearchParams(prev => ({
+                  ...prev, 
+                  countries: value
                 }))}
+                placeholder="Select countries..."
+                searchPlaceholder="Search countries..."
+                multiple={true}
               />
             </div>
 
@@ -645,7 +686,7 @@ export default function CompanySearchPage() {
               <TableBody>
                 {companyResults.map((company, index) => (
                   <TableRow key={index}>
-                    <TableCell>{company.name}</TableCell>
+                    <TableCell>{company.name || 'N/A'}</TableCell>
                     <TableCell>
                       {company.domain && (
                         <a 
@@ -658,10 +699,10 @@ export default function CompanySearchPage() {
                         </a>
                       )}
                     </TableCell>
-                    <TableCell>{company.countries.join(', ')}</TableCell>
-                    <TableCell>{company.industries.join(', ')}</TableCell>
-                    <TableCell>{company.employeeCount.toLocaleString()}</TableCell>
-                    <TableCell>{company.revenue}</TableCell>
+                    <TableCell>{Array.isArray(company.countries) ? company.countries.join(', ') : (company.countries || 'N/A')}</TableCell>
+                    <TableCell>{Array.isArray(company.industries) ? company.industries.join(', ') : (company.industries || 'N/A')}</TableCell>
+                    <TableCell>{company.employeeCount ? company.employeeCount.toLocaleString() : 'N/A'}</TableCell>
+                    <TableCell>{company.revenue || 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

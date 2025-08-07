@@ -1,10 +1,35 @@
+import { EnvironmentValidator } from "./services/EnvironmentValidator";
+import dotenv from 'dotenv';
+
+const dns = require('dns');
+
+// Configure reliable DNS servers to prevent ENOTFOUND errors
+dns.setServers([
+  '8.8.8.8',      // Google DNS Primary
+  '8.8.4.4',      // Google DNS Secondary  
+  '1.1.1.1',      // Cloudflare DNS Primary
+  '1.0.0.1',      // Cloudflare DNS Secondary
+  '208.67.222.222', // OpenDNS
+  '208.67.220.220'  // OpenDNS
+]);
+
+console.log('🔧 DNS servers configured:', dns.getServers());
+
+// Test DNS resolution for Surfe API
+dns.lookup('api.surfe.com', (err: any, address: string) => {
+  if (err) {
+    console.error('❌ DNS lookup failed for api.surfe.com:', err.message);
+  } else {
+    console.log('✅ DNS lookup successful for api.surfe.com:', address);
+  }
+});
+
 import express, { Application } from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
@@ -13,8 +38,15 @@ import { providersRouter } from './routes/providers';
 import { jobsRouter } from './routes/jobs';
 import { uploadRouter } from './routes/upload';
 import { exportRouter } from './routes/export';
+import { apiKeyRouter } from './routes/apiKeyRoutes';
+import { dashboardRouter } from './routes/dashboard';
 import { setupSocket } from './config/socket';
-import { ProviderRegistry } from './services/providers/ProviderRegistry';
+import { ProviderRegistry } from './services/providers';
+import { ProviderService } from './services/provider.service';
+import authRouter from './routes/auth';
+
+// Load environment variables at the very beginning
+dotenv.config();
 
 // Enhanced provider initialization
 logger.info('🔌 Initializing providers...');
@@ -36,9 +68,6 @@ setTimeout(() => {
   }
 }, 100);
 
-// Load environment variables
-dotenv.config();
-
 // Create Express app
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
@@ -51,7 +80,7 @@ const io = setupSocket(server);
 
 // Make io available globally for job notifications
 declare global {
-  var io: import('socket.io').Server;  // ✅ Use the actual type
+  var io: import('socket.io').Server;
 }
 global.io = io;
 
@@ -97,12 +126,15 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use('/api/auth', authRouter);
 // API Routes
 app.use('/health', healthRouter);
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/providers', providersRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/export', exportRouter);
+app.use('/api', apiKeyRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -131,19 +163,26 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Start server with Socket.io support
-server.listen(PORT, () => {
-  logger.info(`🚀 LeadEnrich Pro API server running on port ${PORT}`);
-  logger.info(`📖 Environment: ${process.env.NODE_ENV}`);
-  logger.info(`🌐 API URL: http://localhost:${PORT}`);
-  logger.info(`🔌 Socket.io enabled`);
-});
+const startServer = () => {
+  server.listen(PORT, () => {
+    logger.info(`🚀 LeadEnrich Pro API server running on port ${PORT}`);
+    // ...
+  });
+};
 
-// Start server
-// const server = app.listen(PORT, () => {
-//   logger.info(`🚀 LeadEnrich Pro API server running on port ${PORT}`);
-//   logger.info(`📖 Environment: ${process.env.NODE_ENV}`);
-//   logger.info(`🌐 API URL: http://localhost:${PORT}`);
-// });
+// --- MODIFIED STARTUP SEQUENCE ---
+// Start server first, then try to connect to database
+startServer();
+
+// Try to initialize database connection in background
+ProviderService.ensureProvidersExist()
+  .then(() => {
+    logger.info('✅ Database connection established and providers seeded');
+  })
+  .catch((error) => {
+    logger.error('⚠️ Database connection failed, but server is still running:', error.message);
+    // Don't exit - let the server handle requests and return proper error messages
+  });
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {

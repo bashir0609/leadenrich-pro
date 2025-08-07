@@ -6,3 +6,4 @@ export declare class DataCleaningService {
     static cleanCompanyName(company: string | null | undefined): string | null;
     static extractDomainFromEmail(email: string | null | undefined): string | null;
 }
+//# sourceMappingURL=DataCleaningService.d.ts.map

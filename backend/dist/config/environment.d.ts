@@ -1,6 +1,6 @@
 export declare const env: {
-    NODE_ENV: "development" | "test" | "production";
     ENCRYPTION_KEY: string;
+    NODE_ENV: "development" | "production" | "test";
     JWT_SECRET: string;
     PORT: number;
     HOST: string;
@@ -9,3 +9,4 @@ export declare const env: {
     CORS_ORIGIN: string;
     SURFE_API_KEY: string;
 };
+//# sourceMappingURL=environment.d.ts.map

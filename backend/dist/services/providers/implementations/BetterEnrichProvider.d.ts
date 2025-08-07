@@ -1,6 +1,6 @@
 import { BaseProvider } from '../base/BaseProvider';
-import { CustomError } from '@/types/errors';
-import { ProviderRequest } from '@/types/providers';
+import { CustomError } from '../../../types/errors';
+import { ProviderOperation, ProviderRequest } from '../../../types/providers';
 export declare enum BetterEnrichOperation {
     SINGLE_ENRICHMENT = "single-enrichment",
     WATERFALL_ENRICHMENT = "waterfall-enrichment",
@@ -37,7 +37,7 @@ export declare class BetterEnrichProvider extends BaseProvider {
     private features;
     constructor(config: any);
     private initializeFeatures;
-    authenticate(): Promise<void>;
+    authenticate(userId?: string): Promise<void>;
     validateConfig(): void;
     mapErrorToStandard(error: any): CustomError;
     protected executeOperation(request: ProviderRequest): Promise<any>;
@@ -46,6 +46,7 @@ export declare class BetterEnrichProvider extends BaseProvider {
     private transformResponse;
     getAvailableFeatures(): BetterEnrichFeature[];
     getFeaturesByCategory(category: string): BetterEnrichFeature[];
-    protected calculateCredits(operation: string): number;
+    calculateCredits(operation: ProviderOperation | string): number;
 }
 export {};
+//# sourceMappingURL=BetterEnrichProvider.d.ts.map

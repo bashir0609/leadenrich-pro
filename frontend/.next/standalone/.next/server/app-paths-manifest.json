@@ -1,0 +1,21 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/enrichment/page": "app/enrichment/page.js",
+  "/jobs/[jobId]/page": "app/jobs/[jobId]/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/login/page": "app/login/page.js",
+  "/jobs/page": "app/jobs/page.js",
+  "/page": "app/page.js",
+  "/providers/[name]/company-enrichment/page": "app/providers/[name]/company-enrichment/page.js",
+  "/forgot-password/page": "app/forgot-password/page.js",
+  "/providers/[name]/company-search/page": "app/providers/[name]/company-search/page.js",
+  "/providers/page": "app/providers/page.js",
+  "/providers/[name]/people-enrichment/page": "app/providers/[name]/people-enrichment/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/providers/[name]/company-lookalike/page": "app/providers/[name]/company-lookalike/page.js",
+  "/providers/[name]/people-search/page": "app/providers/[name]/people-search/page.js",
+  "/test/page": "app/test/page.js",
+  "/register/page": "app/register/page.js",
+  "/providers/[name]/page": "app/providers/[name]/page.js",
+  "/reset-password/page": "app/reset-password/page.js"
+}

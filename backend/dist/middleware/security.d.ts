@@ -12,3 +12,4 @@ export declare const apiRateLimits: {
 };
 export declare const securityHeaders: (req: import("http").IncomingMessage, res: import("http").ServerResponse<import("http").IncomingMessage>, next: (err?: unknown) => void) => void;
 export declare const sanitizeInput: import("express").Handler;
+//# sourceMappingURL=security.d.ts.map

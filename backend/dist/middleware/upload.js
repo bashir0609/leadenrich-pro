@@ -7,7 +7,7 @@ exports.upload = void 0;
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-const errors_1 = require("@/types/errors");
+const errors_1 = require("../types/errors");
 // Ensure upload directory exists
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
 if (!fs_1.default.existsSync(uploadDir)) {

@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.monitoringRouter = void 0;
 const express_1 = require("express");
-const MetricsService_1 = require("@/services/MetricsService");
-const auth_1 = require("@/middleware/auth");
+const MetricsService_1 = require("../services/MetricsService");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 exports.monitoringRouter = router;
 // Prometheus metrics endpoint

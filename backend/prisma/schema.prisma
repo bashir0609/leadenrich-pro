@@ -5,136 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
-
-// Core Provider Management
-model Provider {
-  id              Int       @id @default(autoincrement())
-  name            String    @unique @db.VarChar(50)
-  displayName     String    @db.VarChar(100)
-  category        String    @db.VarChar(50)
-  apiKeyEncrypted String?   @db.Text
-  baseUrl         String    @db.VarChar(255)
-  rateLimit       Int       @default(10)
-  dailyQuota      Int       @default(2000)
-  isActive        Boolean   @default(true)
-  configuration   Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  // Relations
-  features     ProviderFeature[]
-  apiUsage     ApiUsage[]
-  enrichmentJobs EnrichmentJob[]
-
-  @@map("providers")
-  @@index([category])
-  @@index([isActive])
-}
-
-// Provider Features
-model ProviderFeature {
-  id                Int      @id @default(autoincrement())
-  providerId        Int
-  featureId         String   @db.VarChar(100)
-  featureName       String   @db.VarChar(200)
-  category          String   @db.VarChar(50)
-  endpoint          String   @db.VarChar(500)
-  httpMethod        String   @default("POST") @db.VarChar(10)
-  creditsPerRequest Int      @default(1)
-  isActive          Boolean  @default(true)
-  parameters        Json?
-  description       String?  @db.Text
-  createdAt         DateTime @default(now())
-
-  // Relations
-  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@unique([providerId, featureId])
-  @@map("provider_features")
-  @@index([providerId])
-  @@index([category])
-}
-
-// Enrichment Jobs
-model EnrichmentJob {
-  id                String    @id @default(cuid())
-  providerId        Int?
-  jobType           String    @db.VarChar(50)
-  status            String    @default("pending") @db.VarChar(20)
-  totalRecords      Int       @default(0)
-  processedRecords  Int       @default(0)
-  successfulRecords Int       @default(0)
-  failedRecords     Int       @default(0)
-  inputData         Json?
-  outputData        Json?
-  configuration     Json?
-  creditsUsed       Int       @default(0)
-  errorDetails      Json?
-  startedAt         DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relations
-  provider Provider? @relation(fields: [providerId], references: [id])
-  logs     JobLog[]
-
-  @@map("enrichment_jobs")
-  @@index([status])
-  @@index([createdAt])
-}
-
-// Job Logs
-model JobLog {
-  id        Int      @id @default(autoincrement())
-  jobId     String
-  level     String   @db.VarChar(10)
-  message   String   @db.Text
-  details   Json?
-  timestamp DateTime @default(now())
-
-  // Relations
-  job EnrichmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@map("job_logs")
-  @@index([jobId, timestamp])
-}
-
-// API Usage Tracking
-model ApiUsage {
-  id            Int      @id @default(autoincrement())
-  providerId    Int
-  endpoint      String   @db.VarChar(200)
-  method        String   @db.VarChar(10)
-  statusCode    Int
-  creditsUsed   Int      @default(0)
-  responseTime  Int      // milliseconds
-  timestamp     DateTime @default(now())
-
-  // Relations
-  provider Provider @relation(fields: [providerId], references: [id])
-
-  @@map("api_usage")
-  @@index([providerId, timestamp])
-  @@index([timestamp])
-}
-
-// System Configuration
-model SystemConfig {
-  id        Int      @id @default(autoincrement())
-  key       String   @unique @db.VarChar(100)
-  value     Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("system_config")
-}
-
-// Add this User model to the end of your schema.prisma file
-
-// Replace your existing User model with this one
 
 model User {
   id           String    @id @default(cuid())
@@ -147,4 +18,137 @@ model User {
   lastLogin    DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  // User relationships
+  apiKeys        ApiKey[]
+  enrichmentJobs EnrichmentJob[]
+}
+
+model Provider {
+  id              Int       @id @default(autoincrement())
+  name            String    @unique
+  displayName     String
+  category        String
+  apiKeyEncrypted String?
+  baseUrl         String
+  rateLimit       Int       @default(10)
+  dailyQuota      Int       @default(2000)
+  isActive        Boolean   @default(true)
+  configuration   String?   // JSON as string for SQLite
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Provider relationships
+  features       ProviderFeature[]
+  apiUsage       ApiUsage[]
+  enrichmentJobs EnrichmentJob[]
+  apiKeys        ApiKey[]
+
+  @@map("providers")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  keyValue    String
+  providerId  Int      // References Provider.id
+  userId      String   // References User.id
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("api_keys")
+}
+
+model ProviderFeature {
+  id                Int      @id @default(autoincrement())
+  providerId        Int
+  featureId         String
+  featureName       String
+  category          String
+  endpoint          String
+  httpMethod        String   @default("POST")
+  creditsPerRequest Int      @default(1)
+  isActive          Boolean  @default(true)
+  parameters        String?  // JSON as string
+  description       String?
+  createdAt         DateTime @default(now())
+
+  // Relationships
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, featureId])
+  @@map("provider_features")
+}
+
+model EnrichmentJob {
+  id                String    @id @default(cuid())
+  providerId        Int?
+  userId            String    // References User.id - who owns this job
+  jobType           String
+  status            String    @default("pending")
+  totalRecords      Int       @default(0)
+  processedRecords  Int       @default(0)
+  successfulRecords Int       @default(0)
+  failedRecords     Int       @default(0)
+  inputData         String?   // JSON as string
+  outputData        String?   // JSON as string
+  configuration     String?   // JSON as string
+  creditsUsed       Int       @default(0)
+  errorDetails      String?   // JSON as string
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationships
+  provider Provider? @relation(fields: [providerId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs     JobLog[]
+
+  @@map("enrichment_jobs")
+}
+
+model JobLog {
+  id        Int      @id @default(autoincrement())
+  jobId     String
+  level     String
+  message   String
+  details   String?  // JSON as string
+  timestamp DateTime @default(now())
+
+  // Relationships
+  job EnrichmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_logs")
+}
+
+model ApiUsage {
+  id            Int      @id @default(autoincrement())
+  providerId    Int
+  endpoint      String
+  method        String
+  statusCode    Int
+  creditsUsed   Int      @default(0)
+  responseTime  Int
+  timestamp     DateTime @default(now())
+
+  // Relationships
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@map("api_usage")
+}
+
+model SystemConfig {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String   // JSON as string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
 }

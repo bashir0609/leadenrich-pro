@@ -1,3 +1,4 @@
 import { Worker } from 'bullmq';
-import { EnrichmentJobData } from '@/services/QueueService';
-export declare const enrichmentWorker: Worker<EnrichmentJobData, any, string>;
+declare const enrichmentWorker: Worker;
+export { enrichmentWorker };
+//# sourceMappingURL=enrichmentWorker.d.ts.map

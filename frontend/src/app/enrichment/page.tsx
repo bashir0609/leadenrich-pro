@@ -80,7 +80,7 @@ export default function EnrichmentPage() {
       }
 
       const result = await response.json();
-      setParsedData(result.data);
+      setParsedData(result.data.data);
 
       // Initialize mapping from suggestions
       const initialMapping: Record<string, string> = {};
@@ -148,7 +148,7 @@ export default function EnrichmentPage() {
         id: result.jobId,
         status: 'queued',
         progress: {
-          total: result.totalRecords,
+          total: result.data.totalRecords,
           processed: 0,
           successful: 0,
           failed: 0,

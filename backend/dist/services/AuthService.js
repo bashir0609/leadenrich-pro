@@ -6,14 +6,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const client_1 = require("@prisma/client");
-const errors_1 = require("@/types/errors");
-const logger_1 = require("@/utils/logger");
-const prisma = new client_1.PrismaClient();
+const prisma_1 = __importDefault(require("../lib/prisma"));
+const errors_1 = require("../types/errors");
+const logger_1 = require("../utils/logger");
 class AuthService {
     static async register(data) {
         // Check if user exists
-        const existingUser = await prisma.user.findUnique({
+        const existingUser = await prisma_1.default.user.findUnique({
             where: { email: data.email },
         });
         if (existingUser) {
@@ -22,7 +21,7 @@ class AuthService {
         // Hash password
         const hashedPassword = await bcryptjs_1.default.hash(data.password, this.SALT_ROUNDS);
         // Create user
-        const user = await prisma.user.create({
+        const user = await prisma_1.default.user.create({
             data: {
                 email: data.email,
                 password: hashedPassword,
@@ -40,7 +39,7 @@ class AuthService {
     }
     static async login(credentials) {
         // Find user
-        const user = await prisma.user.findUnique({
+        const user = await prisma_1.default.user.findUnique({
             where: { email: credentials.email },
         });
         if (!user) {
@@ -52,7 +51,7 @@ class AuthService {
             throw new errors_1.CustomError(errors_1.ErrorCode.AUTHENTICATION_ERROR, 'Invalid email or password', 401);
         }
         // Update last login
-        await prisma.user.update({
+        await prisma_1.default.user.update({
             where: { id: user.id },
             data: { lastLogin: new Date() },
         });
@@ -75,7 +74,7 @@ class AuthService {
     }
     static async refreshToken(oldToken) {
         const payload = await this.verifyToken(oldToken);
-        const user = await prisma.user.findUnique({
+        const user = await prisma_1.default.user.findUnique({
             where: { id: payload.userId },
         });
         if (!user) {
@@ -86,14 +85,14 @@ class AuthService {
     static async generateApiKey(userId) {
         const apiKey = this.generateSecureKey();
         const hashedKey = await bcryptjs_1.default.hash(apiKey, this.SALT_ROUNDS);
-        await prisma.user.update({
+        await prisma_1.default.user.update({
             where: { id: userId },
             data: { apiKeyHash: hashedKey },
         });
         return apiKey;
     }
     static async validateApiKey(apiKey) {
-        const users = await prisma.user.findMany({
+        const users = await prisma_1.default.user.findMany({
             where: { apiKeyHash: { not: null } },
         });
         for (const user of users) {

@@ -1,12 +1,10 @@
 import { createObjectCsvWriter } from 'csv-writer';
 import * as XLSX from 'xlsx';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import path from 'path';
 import fs from 'fs/promises';
-import { logger } from '@/utils/logger';
-import { CustomError, ErrorCode } from '@/types/errors';
-
-const prisma = new PrismaClient();
+import { logger } from '../utils/logger';
+import { CustomError, ErrorCode } from '../types/errors';
 
 export interface ExportOptions {
   format: 'csv' | 'xlsx' | 'json';
@@ -45,7 +43,7 @@ export class ExportService {
     }
 
     // Get results (in real app, this would come from results storage)
-    const results = job.outputData as any[] || [];
+    const results = job.outputData ? JSON.parse(job.outputData) : [];
 
     const exportDir = path.join(process.cwd(), 'exports');
     await fs.mkdir(exportDir, { recursive: true });

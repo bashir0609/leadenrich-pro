@@ -1,9 +1,6 @@
 import request from 'supertest';
 import app from '../src/app';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
+import prisma from '../lib/prisma';
 describe('Provider System Tests', () => {
   beforeAll(async () => {
     // Ensure test data exists

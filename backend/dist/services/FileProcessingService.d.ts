@@ -15,3 +15,4 @@ export declare class FileProcessingService {
     static suggestColumnMapping(headers: string[], columnTypes: Record<string, string>, targetFields: string[]): ColumnMapping[];
     static cleanupFile(filePath: string): Promise<void>;
 }
+//# sourceMappingURL=FileProcessingService.d.ts.map

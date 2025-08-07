@@ -1,5 +1,5 @@
-import { ProviderOperation } from '@/types/providers';
-import { BaseProvider } from '@/services/providers/base/BaseProvider';
+import { ProviderOperation } from '../types/providers';
+import { BaseProvider } from '../services/providers/base/BaseProvider';
 export interface ProviderMetrics {
     providerId: string;
     displayName: string;
@@ -36,9 +36,10 @@ export declare class ProviderComparisonService {
     /**
      * Get provider instances for all active providers or specified providers
      * @param providerIds Optional list of provider IDs to get instances for
+     * @param userId The ID of the user requesting the instances // <<< ADDED DOCS
      * @returns Array of BaseProvider instances
      */
-    static getProviderInstances(providerIds?: string[]): Promise<BaseProvider[]>;
+    static getProviderInstances(providerIds: string[] | undefined, userId: string): Promise<BaseProvider[]>;
     private static calculateProviderScore;
     private static getOperationCost;
     private static getProviderPros;
@@ -46,3 +47,4 @@ export declare class ProviderComparisonService {
     private static getProviderBestUses;
     private static generateRecommendation;
 }
+//# sourceMappingURL=ProviderComparisonService.d.ts.map

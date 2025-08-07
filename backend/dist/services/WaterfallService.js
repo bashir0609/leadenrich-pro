@@ -2,10 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WATERFALL_CONFIGS = exports.WaterfallService = void 0;
 const ProviderFactory_1 = require("./providers/ProviderFactory");
-const logger_1 = require("@/utils/logger");
-const providers_1 = require("@/types/providers");
+const logger_1 = require("../utils/logger");
+const providers_1 = require("../types/providers");
 class WaterfallService {
-    static async execute(config, params) {
+    static async execute(config, params, userId // <<< 1. ADD THE userId PARAMETER HERE
+    ) {
         const startTime = Date.now();
         const attempts = [];
         const providersUsed = [];
@@ -20,7 +21,8 @@ class WaterfallService {
                 continue;
             }
             try {
-                const provider = await ProviderFactory_1.ProviderFactory.getProvider(step.providerId);
+                // <<< 2. PASS THE userId TO THE FACTORY CALL <<<
+                const provider = await ProviderFactory_1.ProviderFactory.getProvider(step.providerId, userId);
                 const attemptStart = Date.now();
                 const result = await provider.execute({
                     operation: config.operation,

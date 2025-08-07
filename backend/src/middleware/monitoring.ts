@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { MetricsService } from '@/services/MetricsService';
+import { MetricsService } from '../services/MetricsService';
 
 export const metricsMiddleware = (
   req: Request,

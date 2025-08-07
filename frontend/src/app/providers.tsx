@@ -6,6 +6,9 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useEffect, useRef } from 'react';
 import { socketManager } from '@/lib/socket';
 import { useJobStore } from '@/lib/stores/jobStore';
+import { AuthProvider } from '@/lib/contexts/AuthContext';
+import { Header } from '@/components/layout/Header';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,8 +54,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
-      <ReactQueryDevtools initialIsOpen={false} />
+      {/* --- 2. ADD THE AUTHPROVIDER WRAPPER --- */}
+      <AuthProvider>
+        
+        {/* --- 3. IMPLEMENT THE CORRECT LAYOUT STRUCTURE --- */}
+        <div className="min-h-screen bg-background flex flex-col">
+          <Header /> {/* The Header is always visible and is now inside AuthProvider */}
+          
+          <main className="container mx-auto px-4 py-8 flex-grow">
+            <AuthGuard>
+              {children} {/* The page content is protected by the Guard */}
+            </AuthGuard>
+          </main>
+        </div>
+        
+        <ReactQueryDevtools initialIsOpen={false} />
+
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
