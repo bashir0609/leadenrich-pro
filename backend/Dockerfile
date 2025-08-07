@@ -48,4 +48,5 @@ USER nodejs
 EXPOSE 3001
 
 # Run database migrations and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# First, apply database migrations, then start the application
+CMD ["sh", "-c", "npx prisma migrate deploy && node -r tsconfig-paths/register dist/app.js"]
