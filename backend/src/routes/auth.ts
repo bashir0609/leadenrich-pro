@@ -41,6 +41,26 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
   }
 });
 
+// Signup endpoint (alias for register)
+router.post('/signup', validate(registerSchema), async (req, res, next) => {
+  try {
+    const result = await AuthService.register(req.body);
+
+    logger.info(`User signed up successfully: ${req.body.email}`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Signup successful',
+      data: {
+        user: result.user,
+        token: result.token,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // Login endpoint
 router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
