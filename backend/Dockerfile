@@ -48,11 +48,8 @@ USER nodejs
 EXPOSE 3001
 
 # Run database migrations and start the server
-# Copy entrypoint script
-COPY entrypoint.sh .
-
-# Make it executable
-RUN chmod +x ./entrypoint.sh
+# Copy entrypoint script and make it executable
+COPY --chmod=755 entrypoint.sh .
 
 # Set the entrypoint
 ENTRYPOINT ["./entrypoint.sh"]
