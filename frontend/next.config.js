@@ -3,7 +3,7 @@ const nextConfig = {
   // Your existing environment variables
   output: 'standalone',
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://144.91.124.230/api',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://144.91.124.230',
     NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || 'http://144.91.124.230',
     NEXT_PUBLIC_APP_NAME: 'LeadEnrich Pro',
     NEXT_PUBLIC_APP_VERSION: '1.0.0',
