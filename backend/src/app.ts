@@ -126,9 +126,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/api/auth', authRouter);
 // API Routes
-app.use('/health', healthRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/health', healthRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/providers', providersRouter);
 app.use('/api/jobs', jobsRouter);
