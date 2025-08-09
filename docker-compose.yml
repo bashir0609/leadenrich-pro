@@ -46,6 +46,7 @@ services:
       - "3001:3001"
     depends_on:
       - database
+      - redis
     networks:
       - leadenrich-network
     restart: unless-stopped
@@ -100,16 +101,16 @@ services:
     container_name: leadenrich-redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     networks:
       - leadenrich-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
     command: redis-server --appendonly yes
 
 volumes:
