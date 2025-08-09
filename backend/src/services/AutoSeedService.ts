@@ -3,17 +3,25 @@ import prisma from '../lib/prisma';
 export class AutoSeedService {
   static async ensureProvidersExist(): Promise<void> {
     try {
-      // Check if all providers already exist
-      const existingProviders = await prisma.provider.count();
-      const expectedProviders = 5; // surfe, apollo, hunter, betterenrich, companyenrich
-
-      if (existingProviders >= expectedProviders) {
-        logger.info(`✅ Found ${existingProviders} existing providers, skipping auto-seed`);
+      // Get existing provider names
+      const existingProviders = await prisma.provider.findMany({
+        select: { name: true }
+      });
+      const existingProviderNames = new Set(existingProviders.map(p => p.name));
+      
+      // Define all expected providers
+      const allProviderNames = new Set(['surfe', 'apollo', 'hunter', 'betterenrich', 'companyenrich']);
+      
+      // Check if any providers are missing
+      const missingProviders = [...allProviderNames].filter(name => !existingProviderNames.has(name));
+      
+      if (missingProviders.length === 0) {
+        logger.info(`✅ Found all ${allProviderNames.size} providers, skipping auto-seed`);
         return;
       }
-
-      logger.info(`🌱 Found ${existingProviders}/${expectedProviders} providers, auto-seeding missing providers...`);
-
+  
+      logger.info(`🌱 Found ${existingProviderNames.size}/${allProviderNames.size} providers, seeding missing providers: ${missingProviders.join(', ')}`);
+  
       // Define providers to seed
       const providers = [
         {
