@@ -2,7 +2,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '../utils/validation';
-import { ProviderCategory, ProviderOperation } from '../types/providers';
+import { ProviderOperation } from '../types/providers';
 import { ProviderFactory } from '../services/providers/ProviderFactory';
 import { QueueService } from '../services/QueueService';
 import prisma from '../lib/prisma';
@@ -10,44 +10,6 @@ import { logger } from '../utils/logger';
 import { CustomRequest } from '../types/express';
 import { BadRequestError, NotFoundError } from '../types/errors';
 import { authenticate, AuthRequest } from '../middleware/auth';
-
-// Define the Provider and ProviderFeature types
-interface Provider {
-  id: number;
-  name: string;
-  displayName: string;
-  category: string;
-  configuration: string | null;
-  isActive: boolean;
-  features: ProviderFeature[];
-}
-
-interface ProviderFeature {
-  id: number;
-  featureId: string;
-  featureName: string;
-  category: string;
-  endpoint: string;
-  creditsPerRequest: number;
-  isActive: boolean;
-  providerId: number;
-}
-
-interface TransformedProvider {
-  id: number;
-  name: string;
-  displayName: string;
-  category: string;
-  configuration: Record<string, unknown>;
-  features: Array<{
-    id: number;
-    featureId: string;
-    featureName: string;
-    category: string;
-    endpoint: string;
-    creditsPerRequest: number;
-  }>;
-}
 
 const router = Router();
 
@@ -69,26 +31,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
           }
         }
       }
-    }) as unknown as Provider[];
+    });
 
     // Transform providers to include features from the database
-    const transformedProviders = providers.map(provider => {
-      let config = {};
-      try {
-        config = provider.configuration ? JSON.parse(provider.configuration) : {};
-      } catch (error) {
-        logger.error('Error parsing provider configuration:', error);
-      }
-
-      return {
-        id: provider.id,
-        name: provider.name,
-        displayName: provider.displayName,
-        category: provider.category,
-        configuration: config,
-        features: provider.features
-      };
-    });
+    const transformedProviders = providers.map(provider => ({
+      id: provider.id,
+      name: provider.name,
+      displayName: provider.displayName,
+      category: provider.category,
+      configuration: provider.configuration,
+      features: provider.features
+    }));
 
     res.json({
       success: true,
@@ -99,18 +52,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
   }
 });
 
+// Get provider by ID
 router.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    
-    // Validate ID parameter
-    const parsedId = parseInt(id, 10);
-    if (isNaN(parsedId)) {
-      throw BadRequestError('Invalid provider ID');
-    }
-
     const provider = await prisma.provider.findUnique({
-      where: { id: parsedId },
+      where: { id: Number(id) },
       include: {
         features: {
           where: { isActive: true },
@@ -127,30 +74,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction): Prom
     });
 
     if (!provider) {
-      throw NotFoundError(`Provider with ID ${id} not found`);
+      throw new NotFoundError('Provider not found');
     }
-
-    // Parse configuration safely
-    let config = {};
-    try {
-      config = provider.configuration ? JSON.parse(provider.configuration) : {};
-    } catch (error) {
-      logger.error(`Error parsing configuration for provider ${id}:`, error);
-      // Continue with empty config if parsing fails
-    }
-
-    const response: TransformedProvider = {
-      id: provider.id,
-      name: provider.name,
-      displayName: provider.displayName,
-      category: provider.category,
-      configuration: config,
-      features: provider.features
-    };
 
     res.json({
       success: true,
-      data: response,
+      data: provider,
     });
   } catch (error) {
     next(error);
